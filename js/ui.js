@@ -1,8 +1,8 @@
 // ui.js — wiring for the dashboard and the question screen.
 
-import { EXAMPLES } from "../data/examples.js?v=6";
-import { generateQuestion } from "./generator.js?v=6";
-import { RULES } from "./rules.js?v=6";
+import { EXAMPLES } from "../data/examples.js?v=7";
+import { generateQuestion } from "./generator.js?v=7";
+import { RULES } from "./rules.js?v=7";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -170,33 +170,13 @@ function renderQuestion() {
 
   const form = $("#choices");
   form.innerHTML = "";
-  q.choices.forEach((choice, index) => {
-    const label = document.createElement("label");
-    label.className = "choice";
-    label.dataset.index = String(index);
+  form.classList.remove("choices-two-column");
 
-    const input = document.createElement("input");
-    input.type = "radio";
-    input.name = "choice";
-    input.value = String(index);
-    input.addEventListener("change", () => {
-      state.chosenSlotIndex = index;
-      $("#submit").disabled = false;
-    });
-
-    const slot = document.createElement("span");
-    slot.className = "choice-label";
-    slot.textContent = `${choice.label}.`;
-
-    const text = document.createElement("span");
-    text.className = "choice-text";
-    text.textContent = choice.displayText;
-
-    label.appendChild(input);
-    label.appendChild(slot);
-    label.appendChild(text);
-    form.appendChild(label);
-  });
+  if (q.layout === "two_column") {
+    renderTwoColumnChoices(form, q);
+  } else {
+    renderSingleColumnChoices(form, q);
+  }
 
   $("#submit").disabled = true;
   $("#submit").classList.remove("hidden");
@@ -208,6 +188,83 @@ function renderQuestion() {
   $("#explanation-chosen").classList.add("hidden");
 }
 
+function makeChoiceInput(index) {
+  const input = document.createElement("input");
+  input.type = "radio";
+  input.name = "choice";
+  input.value = String(index);
+  input.addEventListener("change", () => {
+    state.chosenSlotIndex = index;
+    $("#submit").disabled = false;
+  });
+  return input;
+}
+
+function renderSingleColumnChoices(form, q) {
+  q.choices.forEach((choice, index) => {
+    const label = document.createElement("label");
+    label.className = "choice";
+    label.dataset.index = String(index);
+
+    const slot = document.createElement("span");
+    slot.className = "choice-label";
+    slot.textContent = `${choice.label}.`;
+
+    const text = document.createElement("span");
+    text.className = "choice-text";
+    text.textContent = choice.displayText;
+
+    label.appendChild(makeChoiceInput(index));
+    label.appendChild(slot);
+    label.appendChild(text);
+    form.appendChild(label);
+  });
+}
+
+function renderTwoColumnChoices(form, q) {
+  form.classList.add("choices-two-column");
+
+  const header = document.createElement("div");
+  header.className = "choice choice-header";
+  // Spacer to align with the radio + label column of the choice rows.
+  const spacer = document.createElement("span");
+  spacer.className = "choice-header-spacer";
+  const xHead = document.createElement("span");
+  xHead.className = "choice-col choice-col-x";
+  xHead.textContent = q.xLabel;
+  const yHead = document.createElement("span");
+  yHead.className = "choice-col choice-col-y";
+  yHead.textContent = q.yLabel;
+  header.appendChild(spacer);
+  header.appendChild(xHead);
+  header.appendChild(yHead);
+  form.appendChild(header);
+
+  q.choices.forEach((choice, index) => {
+    const label = document.createElement("label");
+    label.className = "choice choice-paired";
+    label.dataset.index = String(index);
+
+    const slot = document.createElement("span");
+    slot.className = "choice-label";
+    slot.textContent = `${choice.label}.`;
+
+    const xCell = document.createElement("span");
+    xCell.className = "choice-col choice-col-x";
+    xCell.textContent = choice.xText;
+
+    const yCell = document.createElement("span");
+    yCell.className = "choice-col choice-col-y";
+    yCell.textContent = choice.yText;
+
+    label.appendChild(makeChoiceInput(index));
+    label.appendChild(slot);
+    label.appendChild(xCell);
+    label.appendChild(yCell);
+    form.appendChild(label);
+  });
+}
+
 function submitAnswer() {
   if (state.chosenSlotIndex === null) return;
   const q = state.currentQuestion;
@@ -216,10 +273,10 @@ function submitAnswer() {
   const correctChoice = q.choices[correctIndex];
 
   // Lock and color the choices.
-  for (const labelEl of $$(".choice", $("#choices"))) {
+  for (const labelEl of $$(".choice:not(.choice-header)", $("#choices"))) {
     labelEl.classList.add("locked");
     const input = $('input[type="radio"]', labelEl);
-    input.disabled = true;
+    if (input) input.disabled = true;
     const index = Number(labelEl.dataset.index);
     if (index === correctIndex) labelEl.classList.add("correct");
     if (index === state.chosenSlotIndex && !chosen.isCorrect) {
@@ -227,7 +284,25 @@ function submitAnswer() {
     }
   }
 
-  // Feedback banner.
+  // Merge ctx (case may override example).
+  const ctx = {
+    ...state.currentExample.ctx,
+    ...(state.currentCase.ctx ?? {}),
+  };
+  const params = q.params;
+
+  if (q.layout === "two_column") {
+    renderTwoColumnFeedback(q, chosen, correctChoice, ctx, params);
+  } else {
+    renderSingleColumnFeedback(q, chosen, correctChoice, ctx, params);
+  }
+
+  $("#explanation-tab").classList.remove("hidden");
+  $("#submit").classList.add("hidden");
+  $("#new-question").classList.remove("hidden");
+}
+
+function renderSingleColumnFeedback(q, chosen, correctChoice, ctx, params) {
   const feedback = $("#feedback");
   feedback.classList.remove("hidden", "correct", "incorrect");
   if (chosen.isCorrect) {
@@ -240,9 +315,6 @@ function submitAnswer() {
       `Incorrect. The correct answer is ${correctChoice.label}: ${correctChoice.displayText}.`;
   }
 
-  // Explanation tab.
-  const ctx = state.currentExample.ctx;
-  const params = q.params;
   const correctRule = RULES[correctChoice.ruleId];
   $("#explanation-correct").innerHTML =
     `<h3>Why ${correctChoice.label} (${correctChoice.displayText}) is correct</h3>` +
@@ -257,10 +329,63 @@ function submitAnswer() {
     $("#explanation-chosen").classList.add("hidden");
     $("#explanation-chosen").innerHTML = "";
   }
-  $("#explanation-tab").classList.remove("hidden");
+}
 
-  $("#submit").classList.add("hidden");
-  $("#new-question").classList.remove("hidden");
+function renderTwoColumnFeedback(q, chosen, correctChoice, ctx, params) {
+  const feedback = $("#feedback");
+  feedback.classList.remove("hidden", "correct", "incorrect");
+
+  if (chosen.isCorrect) {
+    feedback.classList.add("correct");
+    feedback.textContent =
+      `Correct. ${q.xLabel} = ${correctChoice.xText}, ` +
+      `${q.yLabel} = ${correctChoice.yText}.`;
+  } else {
+    feedback.classList.add("incorrect");
+    const wrongParts = [];
+    if (!chosen.xIsCorrect) wrongParts.push(q.xLabel);
+    if (!chosen.yIsCorrect) wrongParts.push(q.yLabel);
+    const wrongDesc =
+      wrongParts.length === 2
+        ? "both columns"
+        : `the ${wrongParts[0]} column`;
+    feedback.textContent =
+      `Incorrect — you got ${wrongDesc} wrong. Correct answer is ` +
+      `${correctChoice.label}: ${correctChoice.xText} / ${correctChoice.yText}.`;
+  }
+
+  // Always show why X correct and why Y correct.
+  const xCorrectRule = RULES[q.choices[q.correctSlotIndex].xRuleId];
+  const yCorrectRule = RULES[q.choices[q.correctSlotIndex].yRuleId];
+  $("#explanation-correct").innerHTML =
+    `<h3>${q.xLabel}: ${correctChoice.xText} is correct</h3>` +
+    `<p>${xCorrectRule.explain(params, ctx)}</p>` +
+    `<h3>${q.yLabel}: ${correctChoice.yText} is correct</h3>` +
+    `<p>${yCorrectRule.explain(params, ctx)}</p>`;
+
+  // If chosen X or Y is wrong, explain each part separately.
+  if (chosen.isCorrect) {
+    $("#explanation-chosen").classList.add("hidden");
+    $("#explanation-chosen").innerHTML = "";
+  } else {
+    const sections = [];
+    if (!chosen.xIsCorrect) {
+      const chosenXRule = RULES[chosen.xRuleId];
+      sections.push(
+        `<h3>Your ${q.xLabel} answer (${chosen.xText}) is incorrect</h3>` +
+          `<p>${chosenXRule.explain(params, ctx)}</p>`,
+      );
+    }
+    if (!chosen.yIsCorrect) {
+      const chosenYRule = RULES[chosen.yRuleId];
+      sections.push(
+        `<h3>Your ${q.yLabel} answer (${chosen.yText}) is incorrect</h3>` +
+          `<p>${chosenYRule.explain(params, ctx)}</p>`,
+      );
+    }
+    $("#explanation-chosen").classList.remove("hidden");
+    $("#explanation-chosen").innerHTML = sections.join("");
+  }
 }
 
 function wireQuestionScreen() {

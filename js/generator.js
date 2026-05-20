@@ -26,9 +26,9 @@
 //     minInstant,         // for date-rollover formatting
 //   }
 
-import { RULES } from "./rules.js?v=6";
-import { sample } from "./sampler.js?v=6";
-import { formatTime } from "./time.js?v=6";
+import { RULES } from "./rules.js?v=7";
+import { sample } from "./sampler.js?v=7";
+import { formatTime } from "./time.js?v=7";
 
 function shuffleInPlace(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -65,6 +65,13 @@ const SLOT_LABELS = ["A", "B", "C", "D"];
  * indicates a case authoring problem (too few distractors).
  */
 export function generateQuestion(exampleSpec, caseSpec, maxOuterAttempts = 50) {
+  if (caseSpec.layout === "two_column") {
+    return generateTwoColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts);
+  }
+  return generateSingleColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts);
+}
+
+function generateSingleColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts) {
   // Merge ctx: case-level fields override example-level. Used for the
   // modified-LCO variants in Example 1.3-4 where Cases 4 and 5 carry
   // CT_A: 72 and EXT_A: 24 over the example defaults of 4 and 4.
@@ -188,6 +195,122 @@ export function generateQuestion(exampleSpec, caseSpec, maxOuterAttempts = 50) {
   throw new Error(
     `generator: could not assemble a valid question for case "${caseSpec.id}" ` +
       `within ${maxOuterAttempts} attempts. Likely too few distractors.`,
+  );
+}
+
+/**
+ * Two-column layout: each choice is a paired (X, Y) tuple with X-value and
+ * Y-value rendered side-by-side. The four choices form a 2x2 grid of
+ * (correct/distractor X) x (correct/distractor Y). Sort order: column 0 is
+ * the smaller X, column 1 the larger; within each row, smaller Y first.
+ *
+ * Returns:
+ *   {
+ *     layout: "two_column",
+ *     params, stem, minInstant, correctSlotIndex,
+ *     xLabel, yLabel,
+ *     choices: [{ label, xText, yText, xRuleId, yRuleId,
+ *                 xIsCorrect, yIsCorrect, isCorrect }, ...4 entries]
+ *   }
+ */
+function generateTwoColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts) {
+  const ctx = { ...exampleSpec.ctx, ...(caseSpec.ctx ?? {}) };
+
+  for (let attempt = 0; attempt < maxOuterAttempts; attempt++) {
+    const params = sample(caseSpec.params, caseSpec.validate ?? null);
+
+    const xCorrectRule = RULES[caseSpec.xCorrectRule];
+    const yCorrectRule = RULES[caseSpec.yCorrectRule];
+    if (!xCorrectRule || !yCorrectRule) {
+      throw new Error(
+        `two_column: missing xCorrectRule or yCorrectRule for case "${caseSpec.id}"`,
+      );
+    }
+    const xCorrect = xCorrectRule.compute(params, ctx);
+    const yCorrect = yCorrectRule.compute(params, ctx);
+
+    const xPool = caseSpec.xDistractorRules
+      .map((id) => ({ ruleId: id, instant: RULES[id].compute(params, ctx) }))
+      .filter((d) => d.instant !== xCorrect);
+    const yPool = caseSpec.yDistractorRules
+      .map((id) => ({ ruleId: id, instant: RULES[id].compute(params, ctx) }))
+      .filter((d) => d.instant !== yCorrect);
+
+    if (xPool.length === 0 || yPool.length === 0) continue;
+
+    const xDist = xPool[Math.floor(Math.random() * xPool.length)];
+    const yDist = yPool[Math.floor(Math.random() * yPool.length)];
+
+    // Row sorting: smaller X first.
+    const xRows = xCorrect < xDist.instant
+      ? [
+          { instant: xCorrect, ruleId: caseSpec.xCorrectRule, isCorrect: true },
+          { instant: xDist.instant, ruleId: xDist.ruleId, isCorrect: false },
+        ]
+      : [
+          { instant: xDist.instant, ruleId: xDist.ruleId, isCorrect: false },
+          { instant: xCorrect, ruleId: caseSpec.xCorrectRule, isCorrect: true },
+        ];
+
+    // Column sorting: smaller Y first.
+    const yCols = yCorrect < yDist.instant
+      ? [
+          { instant: yCorrect, ruleId: caseSpec.yCorrectRule, isCorrect: true },
+          { instant: yDist.instant, ruleId: yDist.ruleId, isCorrect: false },
+        ]
+      : [
+          { instant: yDist.instant, ruleId: yDist.ruleId, isCorrect: false },
+          { instant: yCorrect, ruleId: caseSpec.yCorrectRule, isCorrect: true },
+        ];
+
+    // Flatten the 2x2 grid into A, B, C, D (row-major: A=row0-col0,
+    // B=row0-col1, C=row1-col0, D=row1-col1).
+    const choices = [
+      { x: xRows[0], y: yCols[0] },
+      { x: xRows[0], y: yCols[1] },
+      { x: xRows[1], y: yCols[0] },
+      { x: xRows[1], y: yCols[1] },
+    ];
+
+    const correctSlotIndex = choices.findIndex(
+      (c) => c.x.isCorrect && c.y.isCorrect,
+    );
+
+    choices.forEach((c, i) => {
+      c.label = SLOT_LABELS[i];
+      c.xText = formatTime(c.x.instant);
+      c.yText = formatTime(c.y.instant);
+      c.xRuleId = c.x.ruleId;
+      c.yRuleId = c.y.ruleId;
+      c.xIsCorrect = c.x.isCorrect;
+      c.yIsCorrect = c.y.isCorrect;
+      c.isCorrect = c.x.isCorrect && c.y.isCorrect;
+      // Drop the internal x/y refs; ui.js reads xText/yText/etc.
+      delete c.x;
+      delete c.y;
+    });
+
+    const minInstant = Math.min(xCorrect, xDist.instant, yCorrect, yDist.instant);
+
+    return {
+      layout: "two_column",
+      params,
+      choices,
+      correctSlotIndex,
+      minInstant,
+      xLabel: caseSpec.xLabel ?? "(X)",
+      yLabel: caseSpec.yLabel ?? "(Y)",
+      stem: renderStem(
+        caseSpec.stemTemplate,
+        params,
+        minInstant,
+        caseSpec.stemDateFormat,
+      ),
+    };
+  }
+
+  throw new Error(
+    `generator: could not assemble a two-column question for case "${caseSpec.id}"`,
   );
 }
 

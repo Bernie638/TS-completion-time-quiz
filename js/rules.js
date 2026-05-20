@@ -18,7 +18,7 @@
 // so reaching MODE 4 is "Condition B entry + 12 hours", NOT "B.1 + B.2"
 // sequential.
 
-import { addHours, formatTime } from "./time.js?v=6";
+import { addHours, formatTime } from "./time.js?v=7";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -389,4 +389,108 @@ register(
     `Misinterprets "extension" as another full stated Completion Time ` +
     `applied to V2, then sequences B.1 + B.2. The extension is 24 hours ` +
     `from V1 (initial entry), not another ${ctx.CT_A} hours from V2.`,
+);
+
+// ---------------- EXAMPLE 1.3-1 RULES ----------
+// LCO has only Condition B with B.1 (MODE 3, 6 hr) AND B.2 (MODE 5, 36 hr).
+// Both Completion Times are measured from entry into Condition B, not
+// sequentially. Parameter: t_condB_entry.
+
+register(
+  "mode_3_correct",
+  (p) => addHours(p.t_condB_entry, 6),
+  (p) =>
+    `B.1 requires the plant to be in MODE 3 within 6 hours of entry into ` +
+    `Condition B. Condition B was entered at ` +
+    `${formatTime(p.t_condB_entry)}, so MODE 3 is required by ` +
+    `${formatTime(addHours(p.t_condB_entry, 6))}.`,
+);
+
+register(
+  "mode_5_correct",
+  (p) => addHours(p.t_condB_entry, 36),
+  (p) =>
+    `B.2 requires the plant to be in MODE 5 within 36 hours of entry into ` +
+    `Condition B. The 36-hour clock runs from Condition B entry — not ` +
+    `from when MODE 3 was reached — so B.1 and B.2 are not additive. ` +
+    `Condition B was entered at ${formatTime(p.t_condB_entry)}, so MODE 5 ` +
+    `is required by ${formatTime(addHours(p.t_condB_entry, 36))}.`,
+);
+
+// Generic entry-offset distractors used by 1.3-1 cases. Each represents a
+// plausible misreading or arithmetic error against entry into Condition B.
+
+register(
+  "entry_plus_0",
+  (p) => p.t_condB_entry,
+  () =>
+    `Treats the Required Action as required immediately upon entering ` +
+    `Condition B. B.1 and B.2 each have a stated Completion Time.`,
+);
+
+register(
+  "entry_plus_3",
+  (p) => addHours(p.t_condB_entry, 3),
+  () =>
+    `Halves the 6-hour Completion Time of B.1. The full stated Completion ` +
+    `Time is the deadline, not half of it.`,
+);
+
+register(
+  "entry_plus_6",
+  (p) => addHours(p.t_condB_entry, 6),
+  () =>
+    `Uses 6 hours from Condition B entry. That is B.1's Completion Time ` +
+    `(MODE 3), not B.2's (MODE 5).`,
+);
+
+register(
+  "entry_plus_12",
+  (p) => addHours(p.t_condB_entry, 12),
+  () =>
+    `Uses 12 hours from Condition B entry. Neither B.1 (6 hr) nor B.2 ` +
+    `(36 hr) has a 12-hour Completion Time.`,
+);
+
+register(
+  "entry_plus_18",
+  (p) => addHours(p.t_condB_entry, 18),
+  () =>
+    `Treats B.1 and B.2 as sequential (6 hr + 12 hr) or otherwise picks ` +
+    `18 hours from entry. Both Completion Times are measured from ` +
+    `Condition B entry, not added together.`,
+);
+
+register(
+  "entry_plus_30",
+  (p) => addHours(p.t_condB_entry, 30),
+  () =>
+    `Uses 30 hours from Condition B entry — perhaps subtracting B.1's ` +
+    `6 hours from B.2's 36 hours. B.2's clock runs from Condition B ` +
+    `entry, not from the moment MODE 3 is reached.`,
+);
+
+register(
+  "entry_plus_36",
+  (p) => addHours(p.t_condB_entry, 36),
+  () =>
+    `Uses 36 hours from Condition B entry. That is B.2's Completion Time ` +
+    `(MODE 5), not B.1's (MODE 3).`,
+);
+
+register(
+  "entry_plus_42",
+  (p) => addHours(p.t_condB_entry, 42),
+  () =>
+    `Treats B.1 and B.2 as sequential: 6 hours to MODE 3 plus 36 hours ` +
+    `to MODE 5 = 42 hours. Per TS 1.3-1, both Completion Times run from ` +
+    `entry into Condition B, so they are NOT additive.`,
+);
+
+register(
+  "entry_plus_48",
+  (p) => addHours(p.t_condB_entry, 48),
+  () =>
+    `Uses 48 hours from Condition B entry. Neither B.1 nor B.2 has a ` +
+    `48-hour Completion Time, and B.1 + B.2 sequentially is 42 hr, not 48.`,
 );

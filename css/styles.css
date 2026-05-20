@@ -224,6 +224,39 @@ button.primary:hover:not(:disabled) {
   border-color: var(--incorrect);
 }
 
+/* ----- Two-column choices ----- */
+
+.choices-two-column .choice {
+  display: grid;
+  grid-template-columns: 1.5em 1.5em 1fr 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.choices-two-column .choice-header {
+  background: transparent;
+  border-color: transparent;
+  font-weight: 600;
+  color: var(--muted);
+  padding-top: 4px;
+  padding-bottom: 4px;
+  cursor: default;
+}
+
+.choices-two-column .choice-header:hover {
+  border-color: transparent;
+}
+
+.choices-two-column .choice-header-spacer {
+  /* Spans the radio-input + label-letter columns so the column heads line
+     up with the timestamp cells in each row. */
+  grid-column: 1 / span 2;
+}
+
+.choices-two-column .choice-col {
+  padding: 2px 0;
+}
+
 /* ----- Feedback ----- */
 
 .feedback {
