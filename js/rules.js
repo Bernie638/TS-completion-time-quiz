@@ -18,7 +18,7 @@
 // so reaching MODE 4 is "Condition B entry + 12 hours", NOT "B.1 + B.2"
 // sequential.
 
-import { addHours, formatTime } from "./time.js?v=4";
+import { addHours, formatTime } from "./time.js?v=5";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -189,4 +189,86 @@ register(
     `Condition A clock. Restoring a subsequent inop has no effect on the ` +
     `Condition A clock — it continues to run from the initial entry at ` +
     `${formatTime(p.t_V1_inop, p.t_V1_inop)}.`,
+);
+
+// ---------------- CASE 3 ADDITIONS -------------
+// Case 3: V1 is restored BEFORE V2 becomes inoperable. V1 and V2 are never
+// concurrently inoperable, so V2 is a FRESH entry into Condition A — not a
+// "subsequent" inop. No extension applies. Condition A's clock for V2 runs
+// from V2 inop, and B.2 is required CT_B2 hours after that clock expires.
+//
+// The Example-specific 4-hour extension allowance is stored on ctx as
+// EXT_A so distractor rules can reference it without hard-coding 4.
+
+register(
+  "case_3_correct",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A + ctx.CT_B2),
+  (p, ctx) => {
+    const minDate = p.t_V1_inop;
+    const condAExpiry = addHours(p.t_V2_inop, ctx.CT_A);
+    return (
+      `V1 was restored at ${formatTime(p.t_V1_restore, minDate)} — before ` +
+      `V2 became inoperable at ${formatTime(p.t_V2_inop, minDate)} — so V1 ` +
+      `and V2 are never concurrently inoperable. V2 is therefore a FRESH ` +
+      `entry into Condition A, not a "subsequent" inop, and no extension ` +
+      `applies. Condition A's clock for V2 runs the stated ${ctx.CT_A} hr ` +
+      `from ${formatTime(p.t_V2_inop, minDate)}, expiring at ` +
+      `${formatTime(condAExpiry, minDate)}. Condition B is entered then and ` +
+      `B.2 (MODE 4 in ${ctx.CT_B2} hr) is required by ` +
+      `${formatTime(addHours(condAExpiry, ctx.CT_B2), minDate)}.`
+    );
+  },
+);
+
+register(
+  "B2_from_first_restored",
+  (p, ctx) => addHours(p.t_V1_restore, ctx.CT_B2),
+  (p, ctx) =>
+    `Incorrectly starts the B.2 clock at the time the first valve was ` +
+    `restored to OPERABLE status (${formatTime(p.t_V1_restore, p.t_V1_inop)}). ` +
+    `Restoring V1 exits Condition A; it does not start any clock. The ` +
+    `relevant clock for B.2 is Condition B, which begins only after the ` +
+    `Condition A Completion Time expires.`,
+);
+
+register(
+  "B2_extension_on_first",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A + ctx.EXT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Applies the Example 1.3-4 "up to ${ctx.EXT_A} hr" extension to V1's ` +
+    `Condition A clock, extending it to ${ctx.CT_A + ctx.EXT_A} hours from ` +
+    `V1 inop. The extension only applies when there is a subsequent ` +
+    `inoperability concurrent with the first; here V1 was already restored ` +
+    `when V2 became inoperable, so the extension does not apply to V1.`,
+);
+
+register(
+  "seq_B1B2_from_first_extended",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A + ctx.CT_B1 + ctx.CT_B2),
+  (p, ctx) =>
+    `Treats B.1 and B.2 as sequential after V1's Condition A Completion ` +
+    `Time expires. Two errors: (1) per TS 1.3-1, B.1 and B.2 are not ` +
+    `additive — each runs from entry to Condition B; (2) V1 was restored ` +
+    `before its Condition A clock expired, so this Condition A path never ` +
+    `actually led to Condition B.`,
+);
+
+register(
+  "B2_extension_on_second",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A + ctx.EXT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Applies the Example 1.3-4 "up to ${ctx.EXT_A} hr" extension to V2's ` +
+    `Condition A clock. The extension requires a subsequent inoperability ` +
+    `concurrent with the first; here V2 is a fresh entry into Condition A, ` +
+    `not a subsequent inop, so no extension applies.`,
+);
+
+register(
+  "seq_B1B2_from_first_restore_extended",
+  (p, ctx) => addHours(p.t_V1_restore, ctx.CT_A + ctx.CT_B1 + ctx.CT_B2),
+  (p, ctx) =>
+    `Treats V1's restoration time as the start of a Condition A clock, ` +
+    `then sequences B.1 + B.2. Restoring V1 exits Condition A; it does not ` +
+    `begin any clock. The relevant clock is the fresh Condition A entry ` +
+    `triggered by V2 inop at ${formatTime(p.t_V2_inop, p.t_V1_inop)}.`,
 );

@@ -106,9 +106,14 @@ const case1Closed = (params, ctx) =>
 const case2Closed = (params, ctx) =>
   addHours(params.t_V1_inop, ctx.CT_A + ctx.CT_B2);
 
+// ---- Case 3: V2 is a fresh entry into Condition A ------------------------
+const case3Closed = (params, ctx) =>
+  addHours(params.t_V2_inop, ctx.CT_A + ctx.CT_B2);
+
 let totalFailures = 0;
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[0], case1Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[1], case2Closed);
+totalFailures += runCase(example_1_3_4, example_1_3_4.cases[2], case3Closed);
 
 // ---- Canonical spot checks -----------------------------------------------
 console.log("\n=== Canonical spot checks ===");
@@ -143,6 +148,25 @@ for (const ruleId of [
 ]) {
   const value = RULES[ruleId].compute(c2Params, example_1_3_4.ctx);
   console.log(`  ${ruleId.padEnd(36)} → ${formatTime(value, 60)}`);
+}
+
+console.log("\nCase 3 (V1=0100, V1_restore=0200, V2=0300):");
+const c3Params = { t_V1_inop: 60, t_V1_restore: 120, t_V2_inop: 180 };
+for (const ruleId of [
+  "case_3_correct",
+  "B2_from_first_inop",
+  "B2_from_first_restored",
+  "B2_from_second_inop",
+  "B2_no_extension",
+  "B2_extension_on_first",
+  "seq_B1B2_from_second",
+  "seq_B1B2_from_first_extended",
+  "B2_extension_on_second",
+  "seq_B1B2_from_first_restore_extended",
+  "seq_B1B2_from_second_extended",
+]) {
+  const value = RULES[ruleId].compute(c3Params, example_1_3_4.ctx);
+  console.log(`  ${ruleId.padEnd(40)} → ${formatTime(value, 60)}`);
 }
 
 if (totalFailures > 0) {

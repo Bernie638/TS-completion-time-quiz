@@ -21,7 +21,7 @@
 // fully-resolved param map. Returning `false` triggers a re-sample. Use
 // `maxAttempts` to bound this; failures throw.
 
-import { parseHHMM, addHours } from "./time.js?v=4";
+import { parseHHMM, addHours } from "./time.js?v=5";
 
 function randInt(min, max) {
   // Inclusive on both ends.
