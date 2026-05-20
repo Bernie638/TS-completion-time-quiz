@@ -4,7 +4,7 @@
 // with `available: false` so the dashboard can show them as disabled
 // placeholders.
 
-import { example_1_3_4 } from "./example_1_3_4.js?v=5";
+import { example_1_3_4 } from "./example_1_3_4.js?v=6";
 
 export const EXAMPLES = [
   { id: "1.3-1", title: "Example 1.3-1", available: false },

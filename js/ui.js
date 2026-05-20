@@ -1,8 +1,8 @@
 // ui.js — wiring for the dashboard and the question screen.
 
-import { EXAMPLES } from "../data/examples.js?v=5";
-import { generateQuestion } from "./generator.js?v=5";
-import { RULES } from "./rules.js?v=5";
+import { EXAMPLES } from "../data/examples.js?v=6";
+import { generateQuestion } from "./generator.js?v=6";
+import { RULES } from "./rules.js?v=6";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -97,11 +97,13 @@ async function loadLcoTableFragment(url) {
   }
 }
 
-async function updateReferencePanel(exampleSpec) {
+async function updateReferencePanel(exampleSpec, caseSpec) {
   const container = $("#lco-table-container");
-  container.innerHTML = await loadLcoTableFragment(
-    exampleSpec.reference.lcoTableHtml,
-  );
+  // Cases can override the LCO table fragment (e.g. the modified 72-hr
+  // variant of Example 1.3-4). Falls back to the example-level default.
+  const url =
+    caseSpec?.reference?.lcoTableHtml ?? exampleSpec.reference.lcoTableHtml;
+  container.innerHTML = await loadLcoTableFragment(url);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +158,7 @@ async function newQuestion() {
   state.currentQuestion = generateQuestion(exampleSpec, caseSpec);
   state.chosenSlotIndex = null;
 
-  await updateReferencePanel(exampleSpec);
+  await updateReferencePanel(exampleSpec, caseSpec);
   renderQuestion();
   switchToTab("question");
 }

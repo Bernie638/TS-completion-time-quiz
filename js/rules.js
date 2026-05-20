@@ -18,7 +18,7 @@
 // so reaching MODE 4 is "Condition B entry + 12 hours", NOT "B.1 + B.2"
 // sequential.
 
-import { addHours, formatTime } from "./time.js?v=5";
+import { addHours, formatTime } from "./time.js?v=6";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -271,4 +271,122 @@ register(
     `then sequences B.1 + B.2. Restoring V1 exits Condition A; it does not ` +
     `begin any clock. The relevant clock is the fresh Condition A entry ` +
     `triggered by V2 inop at ${formatTime(p.t_V2_inop, p.t_V1_inop)}.`,
+);
+
+// ---------------- CASES 4 & 5 ADDITIONS --------
+// These cases use the modified Example 1.3-4 LCO with Condition A's stated
+// Completion Time = 72 hours. The TS 1.3 extension cap of +24 hours from
+// initial entry becomes the relevant limit; the "more restrictive of" rule
+// in TS 1.3 selects between (a) initial + CT_A + 24 and (b) subsequent +
+// CT_A. Case 4 (V2 within 24 hr of V1) → (b) wins. Case 5 (V2 > 24 hr after
+// V1) → (a) wins.
+//
+// case_1_correct already implements min(a, b) + CT_B2 and is reused as the
+// correct rule for both Case 4 and Case 5. The new rules below populate
+// the distractor pool with the common conceptual errors specific to the
+// 72-hr variant.
+
+register(
+  "forgot_B2_from_first",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A),
+  (p, ctx) =>
+    `Reports V1's Condition A completion time (${ctx.CT_A} hr after V1 ` +
+    `inop) and forgets that the question asks for MODE 4, not Condition A ` +
+    `expiry. B.2 adds ${ctx.CT_B2} more hours after entry to Condition B.`,
+);
+
+register(
+  "forgot_B2_from_second",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A),
+  (p, ctx) =>
+    `Reports V2's Condition A completion time (${ctx.CT_A} hr after V2 ` +
+    `inop) and forgets that the question asks for MODE 4, not Condition A ` +
+    `expiry. B.2 adds ${ctx.CT_B2} more hours after entry to Condition B.`,
+);
+
+register(
+  "B2_via_a_limit",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A + 24 + ctx.CT_B2),
+  (p, ctx) => {
+    const minDate = p.t_V1_inop;
+    return (
+      `Applies the TS 1.3 (a) limit — initial entry + CT_A + 24 hours = ` +
+      `${formatTime(addHours(p.t_V1_inop, ctx.CT_A + 24), minDate)} — and ` +
+      `then adds B.2 (${ctx.CT_B2} hr). This is the correct answer when ` +
+      `(a) is more restrictive than (b), but a distractor when (b) is more ` +
+      `restrictive.`
+    );
+  },
+);
+
+register(
+  "B2_via_b_limit_only",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A + ctx.CT_B2),
+  (p, ctx) => {
+    const minDate = p.t_V1_inop;
+    return (
+      `Applies only the TS 1.3 (b) limit — subsequent + CT_A = ` +
+      `${formatTime(addHours(p.t_V2_inop, ctx.CT_A), minDate)} — without ` +
+      `checking the (a) cap (initial + CT_A + 24 hr). When V2 is more than ` +
+      `24 hours after V1, the (a) limit is more restrictive and bounds the ` +
+      `Completion Time before (b) would.`
+    );
+  },
+);
+
+register(
+  "forgot_B2_via_a_limit_from_first",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A + 24),
+  (p, ctx) =>
+    `Reports the TS 1.3 (a) limit (V1 + CT_A + 24 hr) and forgets that ` +
+    `the question asks for MODE 4. B.2 adds ${ctx.CT_B2} more hours.`,
+);
+
+register(
+  "forgot_B2_via_a_limit_from_second",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A + 24),
+  (p, ctx) =>
+    `Adds the 24-hour extension to V2's clock (V2 + CT_A + 24) and forgets ` +
+    `B.2. The 24-hour cap applies from INITIAL entry into Condition A (V1 ` +
+    `inop), not from the subsequent inoperability.`,
+);
+
+register(
+  "seq_B1B2_via_a_limit_from_first",
+  (p, ctx) =>
+    addHours(p.t_V1_inop, ctx.CT_A + 24 + ctx.CT_B1 + ctx.CT_B2),
+  (p, ctx) =>
+    `Applies the (a) limit then sequences B.1 + B.2 (${ctx.CT_B1} hr + ` +
+    `${ctx.CT_B2} hr) additively. Per TS 1.3-1, B.1 and B.2 each run from ` +
+    `entry to Condition B; they are not added.`,
+);
+
+register(
+  "seq_B1B2_via_a_limit_from_second",
+  (p, ctx) =>
+    addHours(p.t_V2_inop, ctx.CT_A + 24 + ctx.CT_B1 + ctx.CT_B2),
+  (p, ctx) =>
+    `Adds the 24-hour extension to V2's clock and then sequences B.1 + ` +
+    `B.2. Two errors: (1) the 24-hour extension cap is measured from V1 ` +
+    `(initial entry), not V2; (2) B.1 and B.2 are concurrent, not additive.`,
+);
+
+register(
+  "seq_B1B2_with_CT_A_as_ext_from_first",
+  (p, ctx) =>
+    addHours(p.t_V1_inop, ctx.CT_A + ctx.CT_A + ctx.CT_B1 + ctx.CT_B2),
+  (p, ctx) =>
+    `Misinterprets "extension" as another full stated Completion Time ` +
+    `(${ctx.CT_A} hr), then sequences B.1 + B.2. The TS 1.3 extension is ` +
+    `capped at 24 hours from initial entry, not another ${ctx.CT_A} hours.`,
+);
+
+register(
+  "seq_B1B2_with_CT_A_as_ext_from_second",
+  (p, ctx) =>
+    addHours(p.t_V2_inop, ctx.CT_A + ctx.CT_A + ctx.CT_B1 + ctx.CT_B2),
+  (p, ctx) =>
+    `Misinterprets "extension" as another full stated Completion Time ` +
+    `applied to V2, then sequences B.1 + B.2. The extension is 24 hours ` +
+    `from V1 (initial entry), not another ${ctx.CT_A} hours from V2.`,
 );

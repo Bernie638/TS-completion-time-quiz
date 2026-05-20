@@ -156,9 +156,123 @@ export const example_1_3_4 = {
       ],
     },
 
-    // ---- cases 4-5 stubbed for later phases ------------------------------
-    // case-4: 72-hr CT variant, <24 hr between inoperabilities
-    // case-5: 72-hr CT variant, >24 hr between inoperabilities
-    //         (note: correct answer for the canonical case 5 = 5 January 2300)
+    {
+      id: "case-4",
+      label: "modified LCO (CT_A = 72 hr), V2 within 24 hr of V1",
+      // Case 4 uses the MODIFIED Example 1.3-4 LCO with Condition A
+      // Completion Time = 72 hours. The case-level ctx and reference
+      // override the example defaults so this case shows the 72-hr
+      // ACTIONS table on the Reference TS tab.
+      ctx: {
+        CT_A: 72,
+        EXT_A: 24, // The TS 1.3 (a) limit: initial + CT_A + 24
+      },
+      reference: {
+        lcoTableHtml: "assets/lco_1_3_4_72hr_table.html",
+      },
+      stemDateFormat: "always",
+      // V1 INOP on day 0 at a random hour.
+      // V2 INOP 1-22 hr after V1 (must be < 24 hr after V1).
+      // V1 RESTORED 2-23 hr after V1 (must be > V2 INOP AND < V1+24).
+      // The validator enforces V1_restore > V2_inop.
+      params: {
+        t_V1_inop: { kind: "randomHHMM", min: "0000", max: "2300" },
+        t_V2_inop: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 1,
+          maxHours: 22,
+        },
+        t_V1_restore: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 2,
+          maxHours: 23,
+        },
+      },
+      validate: (p) => p.t_V1_restore > p.t_V2_inop,
+      stemTemplate:
+        "On {t_V1_inop} Valve V1 is declared INOPERABLE.\n" +
+        "On {t_V2_inop} Valve V2 is declared INOPERABLE.\n" +
+        "On {t_V1_restore} Valve V1 is restored to OPERABLE status.\n\n" +
+        "Using any applicable extensions, what is the latest time the plant " +
+        "is required to be in MODE 4?",
+      correctRule: "case_1_correct",
+      distractorRules: [
+        "B2_from_first_inop",
+        "B2_from_second_inop",
+        "seq_B1B2_from_first",
+        "seq_B1B2_from_second",
+        "forgot_B2_from_first",
+        "forgot_B2_from_second",
+        "seq_B1B2_from_first_extended",
+        "seq_B1B2_from_second_extended",
+        "B2_via_a_limit",
+        "forgot_B2_via_a_limit_from_first",
+        "forgot_B2_via_a_limit_from_second",
+        "seq_B1B2_via_a_limit_from_first",
+        "seq_B1B2_via_a_limit_from_second",
+        "seq_B1B2_with_CT_A_as_ext_from_first",
+        "seq_B1B2_with_CT_A_as_ext_from_second",
+      ],
+    },
+
+    {
+      id: "case-5",
+      label: "modified LCO (CT_A = 72 hr), V2 more than 24 hr after V1",
+      // Case 5: V2 INOP > 24 hr after V1, so the TS 1.3 (a) limit becomes
+      // more restrictive than (b). Correct answer = V1 + CT_A + 24 + CT_B2.
+      ctx: {
+        CT_A: 72,
+        EXT_A: 24,
+      },
+      reference: {
+        lcoTableHtml: "assets/lco_1_3_4_72hr_table.html",
+      },
+      stemDateFormat: "always",
+      // V1 INOP on day 0 at a random hour.
+      // V2 INOP 25-47 hr after V1 (must be > 24 hr, < 48 hr after V1).
+      // V1 RESTORED 26-70 hr after V1 (must be > V2 INOP AND < V1+72).
+      params: {
+        t_V1_inop: { kind: "randomHHMM", min: "0000", max: "2300" },
+        t_V2_inop: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 25,
+          maxHours: 47,
+        },
+        t_V1_restore: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 26,
+          maxHours: 70,
+        },
+      },
+      validate: (p) => p.t_V1_restore > p.t_V2_inop,
+      stemTemplate:
+        "On {t_V1_inop} Valve V1 is declared INOPERABLE.\n" +
+        "On {t_V2_inop} Valve V2 is declared INOPERABLE.\n" +
+        "On {t_V1_restore} Valve V1 is restored to OPERABLE status.\n\n" +
+        "Using any applicable extensions, what is the latest time the plant " +
+        "is required to be in MODE 4?",
+      correctRule: "case_1_correct",
+      distractorRules: [
+        "B2_from_first_inop",
+        "B2_from_second_inop",
+        "seq_B1B2_from_first",
+        "seq_B1B2_from_second",
+        "forgot_B2_from_first",
+        "forgot_B2_from_second",
+        "seq_B1B2_from_first_extended",
+        "seq_B1B2_from_second_extended",
+        "B2_via_b_limit_only",
+        "forgot_B2_via_a_limit_from_first",
+        "forgot_B2_via_a_limit_from_second",
+        "seq_B1B2_via_a_limit_from_first",
+        "seq_B1B2_via_a_limit_from_second",
+        "seq_B1B2_with_CT_A_as_ext_from_first",
+        "seq_B1B2_with_CT_A_as_ext_from_second",
+      ],
+    },
   ],
 };

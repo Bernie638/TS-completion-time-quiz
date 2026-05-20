@@ -26,9 +26,9 @@
 //     minInstant,         // for date-rollover formatting
 //   }
 
-import { RULES } from "./rules.js?v=5";
-import { sample } from "./sampler.js?v=5";
-import { formatTime } from "./time.js?v=5";
+import { RULES } from "./rules.js?v=6";
+import { sample } from "./sampler.js?v=6";
+import { formatTime } from "./time.js?v=6";
 
 function shuffleInPlace(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -65,9 +65,13 @@ const SLOT_LABELS = ["A", "B", "C", "D"];
  * indicates a case authoring problem (too few distractors).
  */
 export function generateQuestion(exampleSpec, caseSpec, maxOuterAttempts = 50) {
+  // Merge ctx: case-level fields override example-level. Used for the
+  // modified-LCO variants in Example 1.3-4 where Cases 4 and 5 carry
+  // CT_A: 72 and EXT_A: 24 over the example defaults of 4 and 4.
+  const ctx = { ...exampleSpec.ctx, ...(caseSpec.ctx ?? {}) };
+
   for (let attempt = 0; attempt < maxOuterAttempts; attempt++) {
     const params = sample(caseSpec.params, caseSpec.validate ?? null);
-    const ctx = exampleSpec.ctx;
 
     const correctRule = RULES[caseSpec.correctRule];
     if (!correctRule) {
@@ -172,7 +176,12 @@ export function generateQuestion(exampleSpec, caseSpec, maxOuterAttempts = 50) {
       choices,
       correctSlotIndex,
       minInstant,
-      stem: renderStem(caseSpec.stemTemplate, params, minInstant),
+      stem: renderStem(
+        caseSpec.stemTemplate,
+        params,
+        minInstant,
+        caseSpec.stemDateFormat,
+      ),
     };
   }
 
@@ -184,13 +193,20 @@ export function generateQuestion(exampleSpec, caseSpec, maxOuterAttempts = 50) {
 
 /**
  * Replace {paramName} tokens in a template with the formatted value of that
- * parameter, relative to the question's earliest instant for date rollover.
+ * parameter.
+ *
+ * dateFormat:
+ *   "auto" (default): same-day timestamps render as HHMM, only show date
+ *                     label on rollover (relative to minInstant).
+ *   "always":         every timestamp renders as "Month Day at HHMM" — used
+ *                     for multi-day cases where date is always meaningful.
  */
-function renderStem(template, params, minInstant) {
+function renderStem(template, params, minInstant, dateFormat = "auto") {
+  const reference = dateFormat === "always" ? null : minInstant;
   return template.replace(/\{(\w+)\}/g, (_, name) => {
     if (!(name in params)) {
       throw new Error(`Stem template references unknown param: ${name}`);
     }
-    return formatTime(params[name], minInstant);
+    return formatTime(params[name], reference);
   });
 }

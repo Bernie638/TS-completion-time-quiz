@@ -41,7 +41,7 @@ function runCase(exampleSpec, caseSpec, closedFormCorrect) {
     }
   }
 
-  const ctx = exampleSpec.ctx;
+  const ctx = { ...exampleSpec.ctx, ...(caseSpec.ctx ?? {}) };
 
   for (let i = 0; i < ITERATIONS; i++) {
     let q;
@@ -110,10 +110,23 @@ const case2Closed = (params, ctx) =>
 const case3Closed = (params, ctx) =>
   addHours(params.t_V2_inop, ctx.CT_A + ctx.CT_B2);
 
+// ---- Cases 4 & 5: modified LCO (CT_A = 72), extension applies -----------
+// Both use the same min(a, b) + CT_B2 formula; only the ctx and the param
+// ranges differ. Case 4 → (b) wins; Case 5 → (a) wins. The closed-form is
+// the same expression in both.
+const case4Closed = (params, ctx) =>
+  Math.min(
+    addHours(params.t_V1_inop, ctx.CT_A + 24),
+    addHours(params.t_V2_inop, ctx.CT_A),
+  ) + ctx.CT_B2 * 60;
+const case5Closed = case4Closed;
+
 let totalFailures = 0;
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[0], case1Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[1], case2Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[2], case3Closed);
+totalFailures += runCase(example_1_3_4, example_1_3_4.cases[3], case4Closed);
+totalFailures += runCase(example_1_3_4, example_1_3_4.cases[4], case5Closed);
 
 // ---- Canonical spot checks -----------------------------------------------
 console.log("\n=== Canonical spot checks ===");
@@ -166,6 +179,68 @@ for (const ruleId of [
   "seq_B1B2_from_second_extended",
 ]) {
   const value = RULES[ruleId].compute(c3Params, example_1_3_4.ctx);
+  console.log(`  ${ruleId.padEnd(40)} → ${formatTime(value, 60)}`);
+}
+
+// Cases 4 and 5 use the modified LCO ctx (CT_A=72, EXT_A=24).
+const ctx72 = {
+  ...example_1_3_4.ctx,
+  ...example_1_3_4.cases[3].ctx,
+};
+
+console.log("\nCase 4 (V1=Jan 1 0100, V2=Jan 1 1000, V1_restore=Jan 1 1200), ctx CT_A=72:");
+const c4Params = {
+  t_V1_inop: 60,
+  t_V2_inop: 60 + 9 * 60,
+  t_V1_restore: 60 + 11 * 60,
+};
+for (const ruleId of [
+  "case_1_correct",
+  "B2_from_first_inop",
+  "B2_from_second_inop",
+  "seq_B1B2_from_first",
+  "seq_B1B2_from_second",
+  "forgot_B2_from_first",
+  "forgot_B2_from_second",
+  "seq_B1B2_from_first_extended",
+  "seq_B1B2_from_second_extended",
+  "B2_via_a_limit",
+  "forgot_B2_via_a_limit_from_first",
+  "forgot_B2_via_a_limit_from_second",
+  "seq_B1B2_via_a_limit_from_first",
+  "seq_B1B2_via_a_limit_from_second",
+  "seq_B1B2_with_CT_A_as_ext_from_first",
+  "seq_B1B2_with_CT_A_as_ext_from_second",
+]) {
+  const value = RULES[ruleId].compute(c4Params, ctx72);
+  console.log(`  ${ruleId.padEnd(40)} → ${formatTime(value, 60)}`);
+}
+
+console.log("\nCase 5 (V1=Jan 1 0100, V2=Jan 2 1100, V1_restore=Jan 2 1200), ctx CT_A=72:");
+const c5Params = {
+  t_V1_inop: 60,
+  t_V2_inop: 60 + 34 * 60,
+  t_V1_restore: 60 + 35 * 60,
+};
+for (const ruleId of [
+  "case_1_correct",
+  "B2_from_first_inop",
+  "B2_from_second_inop",
+  "seq_B1B2_from_first",
+  "seq_B1B2_from_second",
+  "forgot_B2_from_first",
+  "forgot_B2_from_second",
+  "seq_B1B2_from_first_extended",
+  "seq_B1B2_from_second_extended",
+  "B2_via_b_limit_only",
+  "forgot_B2_via_a_limit_from_first",
+  "forgot_B2_via_a_limit_from_second",
+  "seq_B1B2_via_a_limit_from_first",
+  "seq_B1B2_via_a_limit_from_second",
+  "seq_B1B2_with_CT_A_as_ext_from_first",
+  "seq_B1B2_with_CT_A_as_ext_from_second",
+]) {
+  const value = RULES[ruleId].compute(c5Params, ctx72);
   console.log(`  ${ruleId.padEnd(40)} → ${formatTime(value, 60)}`);
 }
 
