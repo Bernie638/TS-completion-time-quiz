@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TS Completion Time Quiz</title>
+    <link rel="stylesheet" href="css/styles.css?v=3" />
+  </head>
+  <body>
+    <main id="app">
+      <!-- Dashboard -->
+      <section id="dashboard" class="screen">
+        <header>
+          <h1>Technical Specifications Completion Time Quiz</h1>
+          <p>
+            Select one or more examples to be tested on, then click
+            <strong>Start</strong>. Each question generates random times within
+            the constraints of the selected example.
+          </p>
+        </header>
+
+        <div class="example-list" id="example-list">
+          <!-- populated by ui.js -->
+        </div>
+
+        <div class="controls">
+          <button type="button" id="select-all">Select all</button>
+          <button type="button" id="start" class="primary">Start</button>
+        </div>
+      </section>
+
+      <!-- Question -->
+      <section id="question-screen" class="screen hidden">
+        <nav class="tabs" id="tabs">
+          <button type="button" class="tab active" data-tab="question">
+            Question
+          </button>
+          <button type="button" class="tab" data-tab="reference">
+            Reference TS
+          </button>
+          <button type="button" class="tab" data-tab="lco303">LCO 3.0.3</button>
+          <button
+            type="button"
+            class="tab hidden"
+            id="explanation-tab"
+            data-tab="explanation"
+          >
+            Explanation
+          </button>
+        </nav>
+
+        <article class="tab-panel active" data-panel="question">
+          <pre id="stem" class="stem"></pre>
+          <form id="choices" class="choices"></form>
+          <div class="controls">
+            <button type="button" id="submit" class="primary" disabled>
+              Submit
+            </button>
+            <button type="button" id="new-question" class="hidden">
+              New Question
+            </button>
+            <button type="button" id="back-to-dashboard">
+              Back to Dashboard
+            </button>
+          </div>
+          <div id="feedback" class="feedback hidden"></div>
+        </article>
+
+        <article class="tab-panel" data-panel="reference">
+          <div id="lco-table-container"></div>
+        </article>
+
+        <article class="tab-panel" data-panel="lco303">
+          <iframe
+            id="lco-pdf"
+            class="pdf"
+            src="assets/lco_3_0_3.pdf"
+            title="LCO 3.0.3 Applicability"
+          ></iframe>
+        </article>
+
+        <article class="tab-panel" data-panel="explanation">
+          <h2>Explanation</h2>
+          <div id="explanation-correct"></div>
+          <div id="explanation-chosen" class="hidden"></div>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="js/ui.js?v=3"></script>
+  </body>
+</html>
