@@ -67,8 +67,50 @@ export const example_1_3_4 = {
       ],
     },
 
-    // ---- cases 2-5 stubbed for later phases ------------------------------
-    // case-2: two valves, second valve repaired first (no extension applies)
+    {
+      id: "case-2",
+      label: "two valves, second valve repaired first",
+      // V1 INOP at a random hour.
+      // V2 INOP 1–2 hours later (so V2 has time to be restored before the
+      // Condition A Completion Time expires at V1 + 4 hr).
+      // V2 RESTORED 1 hour after it became inoperable. Always before Condition
+      // A expiry, satisfying the case-2 premise: V2 (subsequent) is restored
+      // before V1 (first), so the extension criterion fails.
+      params: {
+        t_V1_inop: { kind: "randomHHMM", min: "0000", max: "2300" },
+        t_V2_inop: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 1,
+          maxHours: 2,
+        },
+        t_V2_restore: {
+          kind: "offsetHours",
+          from: "t_V2_inop",
+          minHours: 1,
+          maxHours: 1,
+        },
+      },
+      stemTemplate:
+        "At time {t_V1_inop} Valve V1 is declared INOPERABLE.\n" +
+        "At time {t_V2_inop} Valve V2 is declared INOPERABLE.\n" +
+        "At time {t_V2_restore} Valve V2 is restored to OPERABLE status.\n\n" +
+        "Using any applicable extensions, what is the latest time the plant " +
+        "is required to be in MODE 4?",
+      correctRule: "case_2_correct",
+      distractorRules: [
+        "B2_from_first_inop",
+        "B2_from_second_inop",
+        "B2_from_second_restored",
+        "restart_A_at_second_inop",
+        "seq_B1B2_from_first",
+        "restart_A_at_second_restore",
+        "seq_B1B2_from_second",
+        "seq_B1B2_from_second_extended",
+      ],
+    },
+
+    // ---- cases 3-5 stubbed for later phases ------------------------------
     // case-3: V1 repaired before V2 declared inop (fresh Condition A entry)
     // case-4: 72-hr CT variant, <24 hr between inoperabilities
     // case-5: 72-hr CT variant, >24 hr between inoperabilities

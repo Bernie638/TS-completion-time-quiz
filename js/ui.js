@@ -1,8 +1,8 @@
 // ui.js — wiring for the dashboard and the question screen.
 
-import { EXAMPLES } from "../data/examples.js?v=3";
-import { generateQuestion } from "./generator.js?v=3";
-import { RULES } from "./rules.js?v=3";
+import { EXAMPLES } from "../data/examples.js?v=4";
+import { generateQuestion } from "./generator.js?v=4";
+import { RULES } from "./rules.js?v=4";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));

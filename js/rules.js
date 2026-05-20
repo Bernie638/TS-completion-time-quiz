@@ -18,7 +18,7 @@
 // so reaching MODE 4 is "Condition B entry + 12 hours", NOT "B.1 + B.2"
 // sequential.
 
-import { addHours, formatTime } from "./time.js?v=3";
+import { addHours, formatTime } from "./time.js?v=4";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -135,4 +135,58 @@ register(
     `Adds the stated Condition A Completion Time to the second inoperability ` +
     `time and then sequences B.1 + B.2. This double-applies the extension ` +
     `interpretation and treats B.1 + B.2 as additive when they are not.`,
+);
+
+// ---------------- CASE 2 ADDITIONS -------------
+// Case 2: V2 (subsequent) is restored BEFORE V1 (first), so the TS 1.3
+// extension criterion (b) "must remain inoperable after the first is
+// resolved" is not met. The extension does not apply.
+
+register(
+  "case_2_correct",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A + ctx.CT_B2),
+  (p, ctx) => {
+    const minDate = p.t_V1_inop;
+    const condBEntry = addHours(p.t_V1_inop, ctx.CT_A);
+    return (
+      `V2 (the subsequent inoperability) is restored before V1 (the first), ` +
+      `so TS 1.3 extension criterion (b) — "the subsequent inoperability must ` +
+      `remain inoperable after the first is resolved" — is not met. No ` +
+      `extension applies. Condition A's Completion Time runs from initial ` +
+      `entry at ${formatTime(p.t_V1_inop, minDate)} for the stated ` +
+      `${ctx.CT_A} hr, expiring at ${formatTime(condBEntry, minDate)}. ` +
+      `Condition B is entered at that point and B.2 (MODE 4 in ${ctx.CT_B2} ` +
+      `hr) is required by ${formatTime(addHours(condBEntry, ctx.CT_B2), minDate)}.`
+    );
+  },
+);
+
+register(
+  "B2_from_second_restored",
+  (p, ctx) => addHours(p.t_V2_restore, ctx.CT_B2),
+  (p, ctx) =>
+    `Incorrectly starts the B.2 clock when the second valve is restored to ` +
+    `OPERABLE status (${formatTime(p.t_V2_restore, p.t_V1_inop)}). Restoring ` +
+    `a subsequent inop does not start any clock; the relevant clock is ` +
+    `Condition A, which has been running since the initial entry.`,
+);
+
+register(
+  "restart_A_at_second_inop",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Treats the second inoperability as restarting (or separately entering) ` +
+    `Condition A. Per TS 1.3, subsequent inoperabilities within the same ` +
+    `Condition do not cause re-entry; the Condition A clock continues from ` +
+    `the initial entry at ${formatTime(p.t_V1_inop, p.t_V1_inop)}.`,
+);
+
+register(
+  "restart_A_at_second_restore",
+  (p, ctx) => addHours(p.t_V2_restore, ctx.CT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Treats the restoration of the second valve as restarting the ` +
+    `Condition A clock. Restoring a subsequent inop has no effect on the ` +
+    `Condition A clock — it continues to run from the initial entry at ` +
+    `${formatTime(p.t_V1_inop, p.t_V1_inop)}.`,
 );
