@@ -18,7 +18,7 @@
 // so reaching MODE 4 is "Condition B entry + 12 hours", NOT "B.1 + B.2"
 // sequential.
 
-import { addHours, formatTime } from "./time.js?v=8";
+import { addHours, formatTime } from "./time.js?v=9";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -722,4 +722,172 @@ register(
     `Treats the second pump as starting a fresh Condition A clock AND ` +
     `treats B.1 + B.2 as additive. Two errors: subsequent inops continue ` +
     `the original Cond A clock, and B.1 + B.2 are not sequential.`,
+);
+
+// ---------------- EXAMPLE 1.3-3 RULES ----------
+// LCO: Three Conditions tracked INDEPENDENTLY by entry time.
+//   A. One Function X train inoperable.  CT = 7 days  (clock from V_X inop)
+//   B. One Function Y train inoperable.  CT = 72 hr   (clock from V_Y inop)
+//   C. One X AND one Y train inoperable. CT = 48 hr  (MODIFIED from NUREG's
+//      72 hr to allow distractors that compare B vs C; clock from V_Y inop,
+//      i.e. "the second train was declared inoperable").
+//      C.1 = Restore X train  OR  C.2 = Restore Y train.
+//
+// Because A, B, and C are SEPARATE Conditions (not "or more" sub-cases of
+// a single Condition), the TS 1.3 +24-hour extension provision does NOT
+// apply to any of them. The "extension" distractors test recognition of
+// this scope limit.
+//
+// When a pump is restored to OPERABLE status while in Condition C:
+//   - Restoring X completes C.1 → C is exited; A is also exited (X is
+//     operable). B continues with its 72-hr clock from V_Y inop.
+//   - Restoring Y completes C.2 → C is exited; B is also exited (Y is
+//     operable). A continues with its 7-day clock from V_X inop.
+//
+// Parameters: t_X_inop, t_Y_inop, and (Cases 2/3) t_X_restored or
+// t_Y_restored. Note these use different names from the 1.3-2 rules,
+// since they refer to function trains rather than pumps.
+
+const CT_A_1_3_3 = 168;
+const CT_B_1_3_3 = 72;
+const CT_C_1_3_3 = 48; // MODIFIED from NUREG's 72 hr.
+const EXT_24_1_3_3 = 24;
+const EXT_7DAY_1_3_3 = 168;
+
+register(
+  "function_X_inop_time",
+  (p) => p.t_X_inop,
+  () =>
+    `This is just the time Function X was declared INOPERABLE. LCO 3.0.3 ` +
+    `is entered when a Completion Time expires, not at the moment a ` +
+    `Condition is entered.`,
+);
+
+register(
+  "function_Y_inop_time",
+  (p) => p.t_Y_inop,
+  () =>
+    `This is just the time Function Y was declared INOPERABLE. LCO 3.0.3 ` +
+    `is entered when a Completion Time expires, not at the moment a ` +
+    `Condition is entered.`,
+);
+
+register(
+  "X_plus_C_1_3_3",
+  (p) => addHours(p.t_X_inop, CT_C_1_3_3),
+  () =>
+    `Applies Condition C's ${CT_C_1_3_3}-hour clock from Function X's ` +
+    `inop time. Per TS 1.3-3, Cond C's clock starts when the SECOND ` +
+    `train was declared inoperable (Y inop), not from the first train.`,
+);
+
+register(
+  "Y_plus_C_1_3_3",
+  (p) => addHours(p.t_Y_inop, CT_C_1_3_3),
+  (p) =>
+    `Condition C is entered when both X and Y trains are inoperable. ` +
+    `C's ${CT_C_1_3_3}-hour modified Completion Time runs from the second ` +
+    `train's inop time (Y inop at ${formatTime(p.t_Y_inop)}). When ` +
+    `neither C.1 nor C.2 is satisfied within ${CT_C_1_3_3} hours, no ` +
+    `other ACTIONS Condition applies for two trains inop — LCO 3.0.3 is ` +
+    `entered at ${formatTime(addHours(p.t_Y_inop, CT_C_1_3_3))}. (If ` +
+    `either train is restored within ${CT_C_1_3_3} hours, Cond C is ` +
+    `exited via C.1 or C.2 and this answer no longer applies.)`,
+);
+
+register(
+  "Y_plus_B_1_3_3",
+  (p) => addHours(p.t_Y_inop, CT_B_1_3_3),
+  (p) =>
+    `Condition B's ${CT_B_1_3_3}-hour clock runs from when Function Y ` +
+    `was declared inoperable (${formatTime(p.t_Y_inop)}). When Cond B is ` +
+    `not satisfied, LCO 3.0.3 is entered at ` +
+    `${formatTime(addHours(p.t_Y_inop, CT_B_1_3_3))}. This is the ` +
+    `controlling deadline only if Cond C has already been exited (via ` +
+    `Function X being restored to OPERABLE status, completing C.1).`,
+);
+
+register(
+  "Y_plus_C_plus_24hr_ext_1_3_3",
+  (p) => addHours(p.t_Y_inop, CT_C_1_3_3 + EXT_24_1_3_3),
+  () =>
+    `Adds a 24-hour "extension" to Condition C's clock. The TS 1.3 ` +
+    `+24-hour extension applies ONLY to subsequent inoperabilities within ` +
+    `a single Condition that has an "or more" allowance (e.g., the ` +
+    `"One or more valves inoperable" Condition in Example 1.3-4). In ` +
+    `1.3-3, Conditions A, B, and C are separate Conditions, so the ` +
+    `extension does not apply here.`,
+);
+
+register(
+  "Y_plus_B_plus_24hr_ext_1_3_3",
+  (p) => addHours(p.t_Y_inop, CT_B_1_3_3 + EXT_24_1_3_3),
+  () =>
+    `Adds a 24-hour "extension" to Condition B's 72-hour clock. The ` +
+    `TS 1.3 extension applies only within a single Condition with an ` +
+    `"or more" allowance, not across the LCO's separate A/B/C Conditions.`,
+);
+
+register(
+  "Y_plus_B_plus_C_sequential_1_3_3",
+  (p) => addHours(p.t_Y_inop, CT_B_1_3_3 + CT_C_1_3_3),
+  () =>
+    `Sequences Cond B (${CT_B_1_3_3} hr) and Cond C (${CT_C_1_3_3} hr) ` +
+    `as additive. Per TS 1.3, each Condition's Completion Time runs ` +
+    `independently from when its Condition was entered. Cond B and ` +
+    `Cond C run in parallel from V_Y inop, not sequentially.`,
+);
+
+register(
+  "X_plus_A_1_3_3",
+  (p) => addHours(p.t_X_inop, CT_A_1_3_3),
+  (p) =>
+    `Condition A's 7-day (${CT_A_1_3_3}-hour) clock runs from when ` +
+    `Function X was declared inoperable (${formatTime(p.t_X_inop)}). ` +
+    `When Cond A is not satisfied, LCO 3.0.3 is entered at ` +
+    `${formatTime(addHours(p.t_X_inop, CT_A_1_3_3))}. This is the ` +
+    `controlling deadline only when Cond B and Cond C have been exited ` +
+    `(typically by Function Y being restored, completing C.2 and clearing ` +
+    `Cond B).`,
+);
+
+register(
+  "X_plus_A_plus_24hr_ext_1_3_3",
+  (p) => addHours(p.t_X_inop, CT_A_1_3_3 + EXT_24_1_3_3),
+  () =>
+    `Adds a 24-hour "extension" to Condition A's 7-day clock. Cond A ` +
+    `in 1.3-3 is "One Function X train inoperable" — singular — so no ` +
+    `extension applies. The TS 1.3 +24-hour extension is only for ` +
+    `subsequent inops within a single "or more" Condition.`,
+);
+
+register(
+  "Y_plus_B_plus_7day_ext_1_3_3",
+  (p) => addHours(p.t_Y_inop, CT_B_1_3_3 + EXT_7DAY_1_3_3),
+  () =>
+    `Adds a 7-day "extension" (the full Cond A 168-hour CT) to Cond B's ` +
+    `72-hour clock. TS 1.3 extensions are capped at 24 hours and apply ` +
+    `only within a single "or more" Condition. Neither the cap nor the ` +
+    `scope is right here — and Cond A's 7 days has nothing to do with ` +
+    `Cond B.`,
+);
+
+register(
+  "X_plus_A_plus_C_1_3_3",
+  (p) => addHours(p.t_X_inop, CT_A_1_3_3 + CT_C_1_3_3),
+  () =>
+    `Sequences Cond A (${CT_A_1_3_3} hr) and Cond C.1 (${CT_C_1_3_3} hr) ` +
+    `as if Cond C's clock starts at Cond A's expiry. Cond C's clock ` +
+    `runs independently from the second train's inop, not from Cond A's ` +
+    `expiry. And if Y was restored (which exits Cond C via C.2), Cond C's ` +
+    `clock has stopped — it doesn't restart later.`,
+);
+
+register(
+  "X_plus_A_plus_7day_ext_1_3_3",
+  (p) => addHours(p.t_X_inop, CT_A_1_3_3 + EXT_7DAY_1_3_3),
+  () =>
+    `Doubles Cond A's 7-day clock by adding a 7-day "extension". TS 1.3 ` +
+    `extensions are capped at 24 hours and apply only within a single ` +
+    `"or more" Condition. Cond A in 1.3-3 has no such allowance.`,
 );

@@ -12,6 +12,7 @@
 
 import { example_1_3_1 } from "../data/example_1_3_1.js";
 import { example_1_3_2 } from "../data/example_1_3_2.js";
+import { example_1_3_3 } from "../data/example_1_3_3.js";
 import { example_1_3_4 } from "../data/example_1_3_4.js";
 import { generateQuestion } from "../js/generator.js";
 import { addHours, formatTime } from "../js/time.js";
@@ -238,6 +239,15 @@ const ex_1_3_2_case23_closed = (params) =>
 totalFailures += runCase(example_1_3_2, example_1_3_2.cases[0], ex_1_3_2_case1_closed);
 totalFailures += runCase(example_1_3_2, example_1_3_2.cases[1], ex_1_3_2_case23_closed);
 totalFailures += runCase(example_1_3_2, example_1_3_2.cases[2], ex_1_3_2_case23_closed);
+
+// 1.3-3 closed-form
+const ex_1_3_3_case1_closed = (params) => addHours(params.t_Y_inop, 48);
+const ex_1_3_3_case2_closed = (params) => addHours(params.t_Y_inop, 72);
+const ex_1_3_3_case3_closed = (params) => addHours(params.t_X_inop, 168);
+totalFailures += runCase(example_1_3_3, example_1_3_3.cases[0], ex_1_3_3_case1_closed);
+totalFailures += runCase(example_1_3_3, example_1_3_3.cases[1], ex_1_3_3_case2_closed);
+totalFailures += runCase(example_1_3_3, example_1_3_3.cases[2], ex_1_3_3_case3_closed);
+
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[0], case1Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[1], case2Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[2], case3Closed);
