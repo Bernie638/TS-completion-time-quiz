@@ -18,7 +18,7 @@
 // so reaching MODE 4 is "Condition B entry + 12 hours", NOT "B.1 + B.2"
 // sequential.
 
-import { addHours, formatTime } from "./time.js?v=7";
+import { addHours, formatTime } from "./time.js?v=8";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -493,4 +493,233 @@ register(
   () =>
     `Uses 48 hours from Condition B entry. Neither B.1 nor B.2 has a ` +
     `48-hour Completion Time, and B.1 + B.2 sequentially is 42 hr, not 48.`,
+);
+
+// ---------------- EXAMPLE 1.3-2 RULES ----------
+// LCO: Cond A = One pump inoperable, restore in 7 days; Cond B = MODE 3 in
+// 6 hr AND MODE 5 in 36 hr. When a SECOND pump goes inop while pump 1 is
+// still inop, the LCO has no Condition for two inops, so LCO 3.0.3 is
+// entered (a: MODE 3 in 7 hr, b: MODE 4 in 13 hr, c: MODE 5 in 37 hr —
+// all measured from LCO 3.0.3 entry = the second pump's inop time).
+//
+// Critical pedagogy: the TS 1.3 +24-hr extension does NOT apply to this
+// example, because Condition A is "One pump inoperable" (singular) — there
+// is no "or more" allowing the Condition to cover subsequent inops. That's
+// why LCO 3.0.3 is required in the first place.
+//
+// Parameters: t_V1_inop (fixed Jan 1 0100), t_V2_inop (random within Cond
+// A window), and for Cases 2/3 either t_V1_restore or t_V2_restore.
+
+// Constants in hours.
+const CT_A_1_3_2 = 168; // 7 days
+const CT_B1_1_3_2 = 6;
+const CT_B2_1_3_2 = 36; // MODE 5 (not MODE 4 as in 1.3-4)
+const LCO_303_A = 7; // MODE 3 within 7 hr of LCO 3.0.3 entry
+const LCO_303_B = 13; // MODE 4 within 13 hr
+const LCO_303_C = 37; // MODE 5 within 37 hr
+const EXTENSION_24 = 24;
+
+// ---- Case 1 correct -----
+register(
+  "lco_303c_from_second",
+  (p) => addHours(p.t_V2_inop, LCO_303_C),
+  (p) =>
+    `When the second pump is declared INOPERABLE while pump 1 is still ` +
+    `inoperable, the LCO has no Condition covering two simultaneous ` +
+    `inoperable pumps, so LCO 3.0.3 is entered. LCO 3.0.3.c requires ` +
+    `MODE 5 within ${LCO_303_C} hours of LCO 3.0.3 entry (the second ` +
+    `pump's inop time at ${formatTime(p.t_V2_inop)}). MODE 5 is therefore ` +
+    `required by ${formatTime(addHours(p.t_V2_inop, LCO_303_C))}.`,
+);
+
+// ---- Cases 2 & 3 correct -----
+register(
+  "condA_plus_B2_from_first",
+  (p) => addHours(p.t_V1_inop, CT_A_1_3_2 + CT_B2_1_3_2),
+  (p) =>
+    `Once a pump is restored to OPERABLE status, only one pump is ` +
+    `inoperable again — LCO 3.0.3 is exited and Condition A continues. ` +
+    `Per TS 1.3-2, the Condition A clock is NOT reset; it continues from ` +
+    `pump 1's inop time at ${formatTime(p.t_V1_inop)}. No +24 hour ` +
+    `extension is available — Condition A reads "One pump inoperable" ` +
+    `(singular), so there is no provision allowing the Condition to cover ` +
+    `subsequent inops, which is why LCO 3.0.3 was required in the first ` +
+    `place. Condition A expires ${CT_A_1_3_2} hr after pump 1's inop ` +
+    `at ${formatTime(addHours(p.t_V1_inop, CT_A_1_3_2))}; Condition B is ` +
+    `then entered, and B.2 requires MODE 5 within ${CT_B2_1_3_2} more ` +
+    `hours, so MODE 5 is required by ` +
+    `${formatTime(addHours(p.t_V1_inop, CT_A_1_3_2 + CT_B2_1_3_2))}.`,
+);
+
+// ---- Distractors anchored on the FIRST pump's inop ------------------
+
+register(
+  "B2_from_first_no_condA",
+  (p) => addHours(p.t_V1_inop, CT_B2_1_3_2),
+  () =>
+    `Treats B.2 (MODE 5 in 36 hr) as running from pump 1's inop time. ` +
+    `B.2 only applies after Condition B is entered (which only happens ` +
+    `after Condition A's 7-day Completion Time expires).`,
+);
+
+register(
+  "lco_303c_from_first",
+  (p) => addHours(p.t_V1_inop, LCO_303_C),
+  () =>
+    `Applies LCO 3.0.3.c from pump 1's inop time. LCO 3.0.3 is not ` +
+    `entered when a single pump is inoperable — Condition A covers that ` +
+    `case. LCO 3.0.3 is entered when the SECOND pump is declared inop.`,
+);
+
+register(
+  "condA_plus_B1_from_first",
+  (p) => addHours(p.t_V1_inop, CT_A_1_3_2 + CT_B1_1_3_2),
+  () =>
+    `Reports the B.1 (MODE 3) deadline instead of B.2 (MODE 5). The ` +
+    `question asks for MODE 5, which has B.2's 36-hr Completion Time, ` +
+    `not B.1's 6 hr.`,
+);
+
+register(
+  "condA_plus_303a_from_first",
+  (p) => addHours(p.t_V1_inop, CT_A_1_3_2 + LCO_303_A),
+  () =>
+    `Applies LCO 3.0.3.a (MODE 3 in 7 hr) starting at Condition A's ` +
+    `expiry. Two errors: (1) the question asks for MODE 5, not MODE 3; ` +
+    `and (2) LCO 3.0.3 was entered when the SECOND pump became inoperable, ` +
+    `not when Condition A's clock ran out.`,
+);
+
+register(
+  "condA_plus_303b_from_first",
+  (p) => addHours(p.t_V1_inop, CT_A_1_3_2 + LCO_303_B),
+  () =>
+    `Applies LCO 3.0.3.b (MODE 4 in 13 hr) starting at Condition A's ` +
+    `expiry. The question asks for MODE 5, not MODE 4, and LCO 3.0.3 ` +
+    `was entered at the second pump's inop time, not at Condition A's ` +
+    `expiry.`,
+);
+
+register(
+  "condA_plus_303c_from_first",
+  (p) => addHours(p.t_V1_inop, CT_A_1_3_2 + LCO_303_C),
+  () =>
+    `Applies LCO 3.0.3.c (MODE 5 in 37 hr) starting at Condition A's ` +
+    `expiry. LCO 3.0.3 was entered at the SECOND pump's inop time, not ` +
+    `when Condition A expired.`,
+);
+
+register(
+  "condA_plus_seq_B1B2_from_first",
+  (p) =>
+    addHours(p.t_V1_inop, CT_A_1_3_2 + CT_B1_1_3_2 + CT_B2_1_3_2),
+  () =>
+    `Treats B.1 and B.2 as sequential (6 hr to MODE 3, then 36 hr to ` +
+    `MODE 5) after Condition A expires. Per TS 1.3-1, both B.1 and B.2 ` +
+    `Completion Times run from entry to Condition B — they are not added ` +
+    `together.`,
+);
+
+register(
+  "condA_plus_24_extension_plus_B2_from_first",
+  (p) =>
+    addHours(p.t_V1_inop, CT_A_1_3_2 + EXTENSION_24 + CT_B2_1_3_2),
+  () =>
+    `Applies a 24-hour extension to Condition A's Completion Time, then ` +
+    `B.2 from there. The TS 1.3 extension only applies to Conditions ` +
+    `that accept "one or more" components (as in Example 1.3-4). Example ` +
+    `1.3-2's Condition A is "One pump inoperable" — singular — so no ` +
+    `extension is available here.`,
+);
+
+register(
+  "condA_plus_seven_day_extension_plus_B2_from_first",
+  (p) =>
+    addHours(p.t_V1_inop, CT_A_1_3_2 + CT_A_1_3_2 + CT_B2_1_3_2),
+  () =>
+    `Applies a 7-day "extension" (= a second full Condition A Completion ` +
+    `Time) before B.2. Wrong on two counts: TS 1.3 extensions are capped ` +
+    `at 24 hours, and no extension applies to Example 1.3-2 at all (the ` +
+    `LCO doesn't permit it).`,
+);
+
+// ---- Distractors anchored on the SECOND pump's inop -----------------
+
+register(
+  "B2_from_second_no_condA",
+  (p) => addHours(p.t_V2_inop, CT_B2_1_3_2),
+  () =>
+    `Treats B.2 (MODE 5 in 36 hr) as running from the second pump's inop ` +
+    `time. B.2 only applies after Condition B is entered; Condition B is ` +
+    `not directly relevant once LCO 3.0.3 is in effect.`,
+);
+
+register(
+  "lco_303a_from_second",
+  (p) => addHours(p.t_V2_inop, LCO_303_A),
+  () =>
+    `Reports LCO 3.0.3.a (MODE 3 in 7 hr). The question asks for MODE 5, ` +
+    `not MODE 3. Stopping at MODE 3 leaves the plant in a condition where ` +
+    `the LCO is still applicable.`,
+);
+
+register(
+  "lco_303b_from_second",
+  (p) => addHours(p.t_V2_inop, LCO_303_B),
+  () =>
+    `Reports LCO 3.0.3.b (MODE 4 in 13 hr). The question asks for MODE 5, ` +
+    `not MODE 4. The plant must continue cooling down past MODE 4 to ` +
+    `exit the LCO's applicability.`,
+);
+
+register(
+  "lco_303_sequential_from_second",
+  (p) => addHours(p.t_V2_inop, LCO_303_A + LCO_303_B + LCO_303_C),
+  () =>
+    `Treats LCO 3.0.3's three sub-Completion Times as sequential ` +
+    `(7 + 13 + 37 = 57 hr). Each sub-Completion Time is measured ` +
+    `independently from LCO 3.0.3 entry, NOT from the completion of the ` +
+    `previous one; they are not additive.`,
+);
+
+register(
+  "condA_plus_B1_from_second",
+  (p) => addHours(p.t_V2_inop, CT_A_1_3_2 + CT_B1_1_3_2),
+  () =>
+    `Treats the second pump's inop as the start of a fresh Condition A ` +
+    `clock, then reports B.1 (MODE 3). Per TS 1.3, subsequent inops do ` +
+    `not start a new Condition A clock; the clock continues from the ` +
+    `original entry. (And the question asks for MODE 5, not MODE 3.)`,
+);
+
+register(
+  "condA_plus_B2_from_second",
+  (p) => addHours(p.t_V2_inop, CT_A_1_3_2 + CT_B2_1_3_2),
+  () =>
+    `Treats the second pump's inop as the start of a fresh Condition A ` +
+    `clock, then adds B.2. Per TS 1.3, subsequent inops within the same ` +
+    `Condition continue with the original Condition's clock — they don't ` +
+    `start a new one. And because Condition A here is "One pump" only, ` +
+    `the second pump cannot be in Condition A at all — LCO 3.0.3 is what ` +
+    `applies.`,
+);
+
+register(
+  "condA_plus_303c_from_second",
+  (p) => addHours(p.t_V2_inop, CT_A_1_3_2 + LCO_303_C),
+  () =>
+    `Treats the second pump as starting a fresh Condition A clock, then ` +
+    `applies LCO 3.0.3.c after that. Neither is right: subsequent inops ` +
+    `don't restart Condition A, and LCO 3.0.3 is entered immediately ` +
+    `when the second pump fails (at ${"`"}V2_inop${"`"}), not 7 days later.`,
+);
+
+register(
+  "condA_plus_seq_B1B2_from_second",
+  (p) =>
+    addHours(p.t_V2_inop, CT_A_1_3_2 + CT_B1_1_3_2 + CT_B2_1_3_2),
+  () =>
+    `Treats the second pump as starting a fresh Condition A clock AND ` +
+    `treats B.1 + B.2 as additive. Two errors: subsequent inops continue ` +
+    `the original Cond A clock, and B.1 + B.2 are not sequential.`,
 );

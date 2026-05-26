@@ -26,9 +26,9 @@
 //     minInstant,         // for date-rollover formatting
 //   }
 
-import { RULES } from "./rules.js?v=7";
-import { sample } from "./sampler.js?v=7";
-import { formatTime } from "./time.js?v=7";
+import { RULES } from "./rules.js?v=8";
+import { sample } from "./sampler.js?v=8";
+import { formatTime } from "./time.js?v=8";
 
 function shuffleInPlace(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -38,12 +38,28 @@ function shuffleInPlace(arr) {
   return arr;
 }
 
-function pickN(pool, n) {
+function pickN(pool, n, plausibleSet = null) {
   // Returns n distinct values from pool with no duplicate `instant`s.
-  const shuffled = shuffleInPlace(pool.slice());
+  //
+  // Strict priority: if `plausibleSet` is provided and non-empty, items
+  // whose ruleId is in the set are tried FIRST. Non-plausible items are
+  // drawn only if the plausibles can't fill the slot.
+  let ordered;
+  if (plausibleSet && plausibleSet.size > 0) {
+    const plausible = shuffleInPlace(
+      pool.filter((d) => plausibleSet.has(d.ruleId)),
+    );
+    const others = shuffleInPlace(
+      pool.filter((d) => !plausibleSet.has(d.ruleId)),
+    );
+    ordered = [...plausible, ...others];
+  } else {
+    ordered = shuffleInPlace(pool.slice());
+  }
+
   const out = [];
   const seen = new Set();
-  for (const item of shuffled) {
+  for (const item of ordered) {
     if (seen.has(item.instant)) continue;
     seen.add(item.instant);
     out.push(item);
@@ -86,6 +102,8 @@ function generateSingleColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts) {
     }
     const correctInstant = correctRule.compute(params, ctx);
 
+    const plausibleSet = new Set(caseSpec.plausibleDistractors ?? []);
+
     const distractorPool = [];
     for (const ruleId of caseSpec.distractorRules) {
       const rule = RULES[ruleId];
@@ -95,15 +113,20 @@ function generateSingleColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts) {
       distractorPool.push({ ruleId, instant });
     }
 
-    // Dedupe pool first by instant so feasibility math reflects actual usable
-    // values. We keep the FIRST occurrence of each instant.
-    const seen = new Set();
-    const dedupedPool = [];
+    // Dedupe pool by instant; when two rules collide on the same value,
+    // prefer the plausible variant so its explanation is the one available
+    // to the learner.
+    const byInstant = new Map();
     for (const item of distractorPool) {
-      if (seen.has(item.instant)) continue;
-      seen.add(item.instant);
-      dedupedPool.push(item);
+      const existing = byInstant.get(item.instant);
+      if (
+        !existing ||
+        (plausibleSet.has(item.ruleId) && !plausibleSet.has(existing.ruleId))
+      ) {
+        byInstant.set(item.instant, item);
+      }
     }
+    const dedupedPool = [...byInstant.values()];
 
     const earlier = dedupedPool.filter((d) => d.instant < correctInstant);
     const later = dedupedPool.filter((d) => d.instant > correctInstant);
@@ -125,8 +148,8 @@ function generateSingleColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts) {
     const needEarlier = correctSlotIndex;
     const needLater = 3 - correctSlotIndex;
 
-    const pickedEarlier = pickN(earlier, needEarlier);
-    const pickedLater = pickN(later, needLater);
+    const pickedEarlier = pickN(earlier, needEarlier, plausibleSet);
+    const pickedLater = pickN(later, needLater, plausibleSet);
     if (
       (needEarlier > 0 && pickedEarlier === null) ||
       (needLater > 0 && pickedLater === null)

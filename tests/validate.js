@@ -11,6 +11,7 @@
 //   6. Correct-slot index distribution covers all feasible positions.
 
 import { example_1_3_1 } from "../data/example_1_3_1.js";
+import { example_1_3_2 } from "../data/example_1_3_2.js";
 import { example_1_3_4 } from "../data/example_1_3_4.js";
 import { generateQuestion } from "../js/generator.js";
 import { addHours, formatTime } from "../js/time.js";
@@ -230,6 +231,13 @@ totalFailures += runTwoColumnCase(
 );
 totalFailures += runCase(example_1_3_1, example_1_3_1.cases[1], mode_5_closed);
 totalFailures += runCase(example_1_3_1, example_1_3_1.cases[2], mode_3_closed);
+// 1.3-2 closed-form
+const ex_1_3_2_case1_closed = (params) => addHours(params.t_V2_inop, 37);
+const ex_1_3_2_case23_closed = (params) =>
+  addHours(params.t_V1_inop, 168 + 36);
+totalFailures += runCase(example_1_3_2, example_1_3_2.cases[0], ex_1_3_2_case1_closed);
+totalFailures += runCase(example_1_3_2, example_1_3_2.cases[1], ex_1_3_2_case23_closed);
+totalFailures += runCase(example_1_3_2, example_1_3_2.cases[2], ex_1_3_2_case23_closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[0], case1Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[1], case2Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[2], case3Closed);
