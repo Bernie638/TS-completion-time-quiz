@@ -1,3 +1,5 @@
+import { addHours } from "../js/time.js?v=11";
+
 // Example 1.3-2 — One pump inoperable; behavior when a second pump fails.
 //
 // LCO ACTIONS table:
@@ -186,6 +188,58 @@ export const example_1_3_2 = {
         "condA_plus_24_extension_plus_B2_from_first",
         "condA_plus_seven_day_extension_plus_B2_from_first",
       ],
+    },
+
+    {
+      // Mode-at-time variant of case-1: both pumps stay inoperable; the
+      // LCO 3.0.3 cascade from V2 inop drives the timeline. All four
+      // modes reachable.
+      id: "case-1-mode",
+      label: "MODE at time — both pumps inoperable, LCO 3.0.3 cascade",
+      layout: "mode_at_time",
+      stemDateFormat: "always",
+      params: {
+        t_V1_inop: { kind: "fixedHHMM", value: "0100" },
+        t_V2_inop: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 23,
+          maxHours: 143,
+        },
+      },
+      stemTemplate:
+        "Given:\n" +
+        "  • on {t_V1_inop} a pump is declared INOPERABLE.\n" +
+        "  • on {t_V2_inop} a second pump is declared INOPERABLE.\n" +
+        "  • All Required Actions are performed at the exact time required.\n\n" +
+        "At {t_queryTime}, the plant is required to be in MODE ___.",
+      modeTimeline: (p) => [
+        {
+          mode: 1,
+          fromTime: p.t_V2_inop,
+          transitionReason:
+            "LCO 3.0.3 entered when the second pump went inoperable, but no mode change is required yet",
+        },
+        {
+          mode: 3,
+          fromTime: addHours(p.t_V2_inop, 7),
+          transitionReason:
+            "LCO 3.0.3.a (MODE 3 within 7 hr of LCO 3.0.3 entry)",
+        },
+        {
+          mode: 4,
+          fromTime: addHours(p.t_V2_inop, 13),
+          transitionReason:
+            "LCO 3.0.3.b (MODE 4 within 13 hr of LCO 3.0.3 entry)",
+        },
+        {
+          mode: 5,
+          fromTime: addHours(p.t_V2_inop, 37),
+          transitionReason:
+            "LCO 3.0.3.c (MODE 5 within 37 hr of LCO 3.0.3 entry)",
+        },
+      ],
+      finalSegmentMaxHours: 48,
     },
   ],
 };

@@ -26,9 +26,9 @@
 //     minInstant,         // for date-rollover formatting
 //   }
 
-import { RULES } from "./rules.js?v=10";
-import { sample } from "./sampler.js?v=10";
-import { formatTime } from "./time.js?v=10";
+import { RULES } from "./rules.js?v=11";
+import { sample } from "./sampler.js?v=11";
+import { formatTime } from "./time.js?v=11";
 
 function shuffleInPlace(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -83,6 +83,9 @@ const SLOT_LABELS = ["A", "B", "C", "D"];
 export function generateQuestion(exampleSpec, caseSpec, maxOuterAttempts = 50) {
   if (caseSpec.layout === "two_column") {
     return generateTwoColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts);
+  }
+  if (caseSpec.layout === "mode_at_time") {
+    return generateModeAtTimeQuestion(exampleSpec, caseSpec, maxOuterAttempts);
   }
   return generateSingleColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts);
 }
@@ -334,6 +337,111 @@ function generateTwoColumnQuestion(exampleSpec, caseSpec, maxOuterAttempts) {
 
   throw new Error(
     `generator: could not assemble a two-column question for case "${caseSpec.id}"`,
+  );
+}
+
+/**
+ * mode_at_time layout. Each case defines a `modeTimeline(params, ctx)`
+ * function returning an array of segments:
+ *   [
+ *     { mode, fromTime, transitionReason },
+ *     ...
+ *   ]
+ * The first segment's `fromTime` is the earliest meaningful T for the
+ * question; the segment's `mode` is what's required from there until the
+ * next segment's `fromTime`. `transitionReason` is the human-readable
+ * reason that mode begins (used in explanations).
+ *
+ * The engine picks a target segment uniformly and samples a whole-hour
+ * query time uniformly within its [fromTime, nextFromTime) bucket. The
+ * final segment is capped at `caseSpec.finalSegmentMaxHours` (default 48).
+ *
+ * Returns:
+ *   {
+ *     layout: "mode_at_time",
+ *     params, queryTime, timeline, targetIndex,
+ *     correctSlotIndex,
+ *     choices: [{ label, mode, displayText, isCorrect }, ...4 entries],
+ *     minInstant, stem,
+ *   }
+ */
+function generateModeAtTimeQuestion(exampleSpec, caseSpec, maxOuterAttempts) {
+  const ctx = { ...exampleSpec.ctx, ...(caseSpec.ctx ?? {}) };
+  const finalCapHours = caseSpec.finalSegmentMaxHours ?? 48;
+  const MODES = [1, 3, 4, 5];
+
+  for (let attempt = 0; attempt < maxOuterAttempts; attempt++) {
+    const params = sample(caseSpec.params, caseSpec.validate ?? null);
+    const timeline = caseSpec.modeTimeline(params, ctx);
+
+    if (!Array.isArray(timeline) || timeline.length === 0) {
+      throw new Error(
+        `mode_at_time: empty modeTimeline for case "${caseSpec.id}"`,
+      );
+    }
+
+    // Pick a target segment uniformly.
+    const targetIndex = Math.floor(Math.random() * timeline.length);
+    const targetSegment = timeline[targetIndex];
+
+    // Validate target mode is one of the displayed choices.
+    if (!MODES.includes(targetSegment.mode)) {
+      throw new Error(
+        `mode_at_time: target mode ${targetSegment.mode} not in {1,3,4,5}`,
+      );
+    }
+
+    // Compute sampling window for target segment.
+    const startMin = targetSegment.fromTime;
+    let endMin;
+    if (targetIndex < timeline.length - 1) {
+      endMin = timeline[targetIndex + 1].fromTime;
+    } else {
+      endMin = startMin + finalCapHours * 60;
+    }
+
+    // Need at least 1 hour of room.
+    if (endMin - startMin < 60) continue;
+
+    // Whole-hour T uniformly in [startMin, endMin).
+    const hourCount = Math.floor((endMin - startMin) / 60);
+    const queryTime = startMin + Math.floor(Math.random() * hourCount) * 60;
+
+    const choices = MODES.map((mode, i) => ({
+      label: SLOT_LABELS[i],
+      mode,
+      displayText: `MODE ${mode}`,
+      isCorrect: mode === targetSegment.mode,
+    }));
+    const correctSlotIndex = choices.findIndex((c) => c.isCorrect);
+
+    const minInstant = Math.min(
+      queryTime,
+      ...timeline.map((s) => s.fromTime),
+    );
+
+    const stem = renderStem(
+      caseSpec.stemTemplate,
+      { ...params, t_queryTime: queryTime },
+      minInstant,
+      caseSpec.stemDateFormat,
+    );
+
+    return {
+      layout: "mode_at_time",
+      params,
+      queryTime,
+      timeline,
+      targetIndex,
+      choices,
+      correctSlotIndex,
+      minInstant,
+      stem,
+    };
+  }
+
+  throw new Error(
+    `generator: mode_at_time question failed for case "${caseSpec.id}" within ${maxOuterAttempts} attempts.`,
   );
 }
 

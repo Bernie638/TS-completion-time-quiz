@@ -18,7 +18,7 @@
 // so reaching MODE 4 is "Condition B entry + 12 hours", NOT "B.1 + B.2"
 // sequential.
 
-import { addHours, formatTime } from "./time.js?v=10";
+import { addHours, formatTime } from "./time.js?v=11";
 
 // --- helpers ---------------------------------------------------------------
 

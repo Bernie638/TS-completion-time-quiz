@@ -1,8 +1,8 @@
 // ui.js — wiring for the dashboard and the question screen.
 
-import { EXAMPLES } from "../data/examples.js?v=10";
-import { generateQuestion } from "./generator.js?v=10";
-import { RULES } from "./rules.js?v=10";
+import { EXAMPLES } from "../data/examples.js?v=11";
+import { generateQuestion } from "./generator.js?v=11";
+import { RULES } from "./rules.js?v=11";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -174,6 +174,8 @@ function renderQuestion() {
 
   if (q.layout === "two_column") {
     renderTwoColumnChoices(form, q);
+  } else if (q.layout === "mode_at_time") {
+    renderModeAtTimeChoices(form, q);
   } else {
     renderSingleColumnChoices(form, q);
   }
@@ -201,6 +203,28 @@ function makeChoiceInput(index) {
 }
 
 function renderSingleColumnChoices(form, q) {
+  q.choices.forEach((choice, index) => {
+    const label = document.createElement("label");
+    label.className = "choice";
+    label.dataset.index = String(index);
+
+    const slot = document.createElement("span");
+    slot.className = "choice-label";
+    slot.textContent = `${choice.label}.`;
+
+    const text = document.createElement("span");
+    text.className = "choice-text";
+    text.textContent = choice.displayText;
+
+    label.appendChild(makeChoiceInput(index));
+    label.appendChild(slot);
+    label.appendChild(text);
+    form.appendChild(label);
+  });
+}
+
+function renderModeAtTimeChoices(form, q) {
+  // Four fixed choices: A. MODE 1, B. MODE 3, C. MODE 4, D. MODE 5
   q.choices.forEach((choice, index) => {
     const label = document.createElement("label");
     label.className = "choice";
@@ -293,6 +317,8 @@ function submitAnswer() {
 
   if (q.layout === "two_column") {
     renderTwoColumnFeedback(q, chosen, correctChoice, ctx, params);
+  } else if (q.layout === "mode_at_time") {
+    renderModeAtTimeFeedback(q, chosen, correctChoice);
   } else {
     renderSingleColumnFeedback(q, chosen, correctChoice, ctx, params);
   }
@@ -328,6 +354,76 @@ function renderSingleColumnFeedback(q, chosen, correctChoice, ctx, params) {
   } else {
     $("#explanation-chosen").classList.add("hidden");
     $("#explanation-chosen").innerHTML = "";
+  }
+}
+
+function renderModeAtTimeFeedback(q, chosen, correctChoice) {
+  const feedback = $("#feedback");
+  feedback.classList.remove("hidden", "correct", "incorrect");
+
+  if (chosen.isCorrect) {
+    feedback.classList.add("correct");
+    feedback.textContent =
+      `Correct. The plant is required to be in MODE ${correctChoice.mode}.`;
+  } else {
+    feedback.classList.add("incorrect");
+    feedback.textContent =
+      `Incorrect. The correct answer is ${correctChoice.label}: ` +
+      `MODE ${correctChoice.mode}.`;
+  }
+
+  // Build the timeline display.
+  const targetSegment = q.timeline[q.targetIndex];
+  const nextSegment = q.timeline[q.targetIndex + 1];
+  const formatBound = (instant) => formatTime(instant);
+
+  const fromText = formatBound(targetSegment.fromTime);
+  const untilText = nextSegment ? formatBound(nextSegment.fromTime) : null;
+  const queryTimeText = formatBound(q.queryTime);
+
+  const correctExplanation =
+    `MODE ${correctChoice.mode} is required from ${fromText} ` +
+    `(${targetSegment.transitionReason})` +
+    (untilText
+      ? ` until ${untilText} (when MODE ${nextSegment.mode} becomes required).`
+      : `, and remains the required mode after that.`) +
+    ` The query time ${queryTimeText} falls in this segment.`;
+
+  $("#explanation-correct").innerHTML =
+    `<h3>Why MODE ${correctChoice.mode} is correct</h3>` +
+    `<p>${correctExplanation}</p>`;
+
+  if (chosen.isCorrect) {
+    $("#explanation-chosen").classList.add("hidden");
+    $("#explanation-chosen").innerHTML = "";
+  } else {
+    // Find chosen mode's segment in the timeline, if present.
+    const chosenSegment = q.timeline.find((s) => s.mode === chosen.mode);
+    let chosenExplanation;
+    if (chosenSegment) {
+      const chosenIdx = q.timeline.indexOf(chosenSegment);
+      const chosenFrom = formatBound(chosenSegment.fromTime);
+      const chosenNext = q.timeline[chosenIdx + 1];
+      const chosenUntil = chosenNext ? formatBound(chosenNext.fromTime) : null;
+      chosenExplanation =
+        `MODE ${chosen.mode} is required from ${chosenFrom} ` +
+        `(${chosenSegment.transitionReason})` +
+        (chosenUntil
+          ? ` until ${chosenUntil}.`
+          : `, and remains the required mode after that.`) +
+        ` The query time ${queryTimeText} is ` +
+        (q.queryTime < chosenSegment.fromTime ? "earlier than" : "later than") +
+        ` this segment.`;
+    } else {
+      chosenExplanation =
+        `MODE ${chosen.mode} is not required at any point in this ` +
+        `scenario. The LCO's ACTIONS and any applicable LCO 3.0.3 ` +
+        `cascade do not reach MODE ${chosen.mode} here.`;
+    }
+    $("#explanation-chosen").classList.remove("hidden");
+    $("#explanation-chosen").innerHTML =
+      `<h3>Why MODE ${chosen.mode} (your choice) is incorrect</h3>` +
+      `<p>${chosenExplanation}</p>`;
   }
 }
 

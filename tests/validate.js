@@ -268,6 +268,74 @@ totalFailures += runCase(example_1_3_5, example_1_3_5.cases[2], ex_1_3_5_V2_clos
 totalFailures += runCase(example_1_3_5, example_1_3_5.cases[3], ex_1_3_5_V2_closed);
 totalFailures += runCase(example_1_3_5, example_1_3_5.cases[4], ex_1_3_5_V2_closed);
 
+// ---- Mode-at-time validation ----
+function runModeAtTimeCase(exampleSpec, caseSpec) {
+  console.log(`\n=== ${exampleSpec.id} / ${caseSpec.id} — ${caseSpec.label} ===`);
+  let failures = 0;
+  const modeCounts = { 1: 0, 3: 0, 4: 0, 5: 0 };
+
+  function fail(msg, q) {
+    failures++;
+    console.error(`  FAIL: ${msg}`);
+    if (q) console.error(`    params: ${JSON.stringify(q.params)} queryTime=${q.queryTime}`);
+  }
+
+  const ctx = { ...exampleSpec.ctx, ...(caseSpec.ctx ?? {}) };
+
+  for (let i = 0; i < ITERATIONS; i++) {
+    let q;
+    try {
+      q = generateQuestion(exampleSpec, caseSpec);
+    } catch (err) {
+      fail(`generator threw: ${err.message}`, null);
+      continue;
+    }
+    if (q.layout !== "mode_at_time") {
+      fail(`expected layout "mode_at_time", got "${q.layout}"`, q);
+      continue;
+    }
+    if (q.choices.length !== 4) fail(`expected 4 choices, got ${q.choices.length}`, q);
+
+    // Verify query time falls within target segment.
+    const target = q.timeline[q.targetIndex];
+    const nextSeg = q.timeline[q.targetIndex + 1];
+    if (q.queryTime < target.fromTime) {
+      fail(`query time ${q.queryTime} before segment start ${target.fromTime}`, q);
+    }
+    if (nextSeg && q.queryTime >= nextSeg.fromTime) {
+      fail(`query time ${q.queryTime} not less than next segment start ${nextSeg.fromTime}`, q);
+    }
+
+    // Verify isCorrect on correct slot matches target mode.
+    const correctChoice = q.choices[q.correctSlotIndex];
+    if (correctChoice.mode !== target.mode) {
+      fail(`correct slot mode ${correctChoice.mode} != target ${target.mode}`, q);
+    }
+
+    modeCounts[target.mode]++;
+  }
+
+  console.log(`  Mode coverage: MODE 1=${modeCounts[1]} MODE 3=${modeCounts[3]} MODE 4=${modeCounts[4]} MODE 5=${modeCounts[5]}`);
+  if (failures === 0) console.log(`  All ${ITERATIONS} iterations passed.`);
+  else console.error(`  ${failures} failure(s).`);
+  return failures;
+}
+
+// 1.3-2 case-1-mode (4th case in the cases array — index 3)
+totalFailures += runModeAtTimeCase(example_1_3_2, example_1_3_2.cases[3]);
+// 1.3-3 case-1-mode (index 3), case-2-mode (index 4), case-3-mode (index 5)
+totalFailures += runModeAtTimeCase(example_1_3_3, example_1_3_3.cases[3]);
+totalFailures += runModeAtTimeCase(example_1_3_3, example_1_3_3.cases[4]);
+totalFailures += runModeAtTimeCase(example_1_3_3, example_1_3_3.cases[5]);
+// 1.3-4 cases 5..9 are case-1-mode..case-5-mode
+for (let i = 5; i <= 9; i++) {
+  totalFailures += runModeAtTimeCase(example_1_3_4, example_1_3_4.cases[i]);
+}
+// 1.3-5 cases 5..9 are case-1-mode..case-5-mode
+for (let i = 5; i <= 9; i++) {
+  totalFailures += runModeAtTimeCase(example_1_3_5, example_1_3_5.cases[i]);
+}
+
 // ---- Canonical spot checks -----------------------------------------------
 console.log("\n=== Canonical spot checks ===");
 

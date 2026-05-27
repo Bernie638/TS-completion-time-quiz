@@ -4,11 +4,11 @@
 // with `available: false` so the dashboard can show them as disabled
 // placeholders.
 
-import { example_1_3_1 } from "./example_1_3_1.js?v=10";
-import { example_1_3_2 } from "./example_1_3_2.js?v=10";
-import { example_1_3_3 } from "./example_1_3_3.js?v=10";
-import { example_1_3_4 } from "./example_1_3_4.js?v=10";
-import { example_1_3_5 } from "./example_1_3_5.js?v=10";
+import { example_1_3_1 } from "./example_1_3_1.js?v=11";
+import { example_1_3_2 } from "./example_1_3_2.js?v=11";
+import { example_1_3_3 } from "./example_1_3_3.js?v=11";
+import { example_1_3_4 } from "./example_1_3_4.js?v=11";
+import { example_1_3_5 } from "./example_1_3_5.js?v=11";
 
 export const EXAMPLES = [
   { id: "1.3-1", title: example_1_3_1.title, available: true, spec: example_1_3_1 },

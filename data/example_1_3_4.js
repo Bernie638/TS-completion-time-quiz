@@ -1,3 +1,5 @@
+import { addHours } from "../js/time.js?v=11";
+
 // Example 1.3-4 — One or more valves inoperable.
 //
 // LCO ACTIONS table:
@@ -273,6 +275,275 @@ export const example_1_3_4 = {
         "seq_B1B2_with_CT_A_as_ext_from_first",
         "seq_B1B2_with_CT_A_as_ext_from_second",
       ],
+    },
+
+    // ---- mode-at-time variants ----
+    // 1.3-4 has no LCO 3.0.3 entry in any of our scenarios (Cond B is
+    // provided). Plant timeline ends at MODE 4 (B.2). MODE 5 never
+    // reached but always available as a plausible distractor.
+
+    {
+      id: "case-1-mode",
+      label: "MODE at time — V1 restored after V2, extension applies",
+      layout: "mode_at_time",
+      stemDateFormat: "always",
+      params: {
+        t_V1_inop: { kind: "fixedHHMM", value: "0100" },
+        t_V2_inop: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 1,
+          maxHours: 3,
+        },
+        t_V1_restore: {
+          kind: "offsetHours",
+          from: "t_V2_inop",
+          minHours: 1,
+          maxHours: 1,
+        },
+      },
+      stemTemplate:
+        "At {t_V1_inop} Valve V1 is declared INOPERABLE.\n" +
+        "At {t_V2_inop} Valve V2 is declared INOPERABLE.\n" +
+        "At {t_V1_restore} Valve V1 is restored to OPERABLE status.\n" +
+        "All Required Actions are performed at the exact time required.\n\n" +
+        "At {t_queryTime}, the plant is required to be in MODE ___.",
+      modeTimeline: (p, ctx) => {
+        const condBEntry = Math.min(
+          addHours(p.t_V1_inop, ctx.CT_A + 24),
+          addHours(p.t_V2_inop, ctx.CT_A),
+        );
+        return [
+          {
+            mode: 1,
+            fromTime: p.t_V1_inop,
+            transitionReason:
+              "Cond A entered when V1 went inoperable — no mode change required",
+          },
+          {
+            mode: 3,
+            fromTime: addHours(condBEntry, ctx.CT_B1),
+            transitionReason: `B.1 (MODE 3 within ${ctx.CT_B1} hr of Cond B entry)`,
+          },
+          {
+            mode: 4,
+            fromTime: addHours(condBEntry, ctx.CT_B2),
+            transitionReason: `B.2 (MODE 4 within ${ctx.CT_B2} hr of Cond B entry)`,
+          },
+        ];
+      },
+      finalSegmentMaxHours: 48,
+    },
+
+    {
+      id: "case-2-mode",
+      label: "MODE at time — V2 restored, no extension",
+      layout: "mode_at_time",
+      stemDateFormat: "always",
+      params: {
+        t_V1_inop: { kind: "fixedHHMM", value: "0100" },
+        t_V2_inop: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 1,
+          maxHours: 2,
+        },
+        t_V2_restore: {
+          kind: "offsetHours",
+          from: "t_V2_inop",
+          minHours: 1,
+          maxHours: 1,
+        },
+      },
+      stemTemplate:
+        "At {t_V1_inop} Valve V1 is declared INOPERABLE.\n" +
+        "At {t_V2_inop} Valve V2 is declared INOPERABLE.\n" +
+        "At {t_V2_restore} Valve V2 is restored to OPERABLE status.\n" +
+        "All Required Actions are performed at the exact time required.\n\n" +
+        "At {t_queryTime}, the plant is required to be in MODE ___.",
+      modeTimeline: (p, ctx) => {
+        const condBEntry = addHours(p.t_V1_inop, ctx.CT_A);
+        return [
+          {
+            mode: 1,
+            fromTime: p.t_V1_inop,
+            transitionReason: "Cond A entered; no mode change required yet",
+          },
+          {
+            mode: 3,
+            fromTime: addHours(condBEntry, ctx.CT_B1),
+            transitionReason: "B.1 (MODE 3) — Cond A expired (no extension since V2 was restored before V1)",
+          },
+          {
+            mode: 4,
+            fromTime: addHours(condBEntry, ctx.CT_B2),
+            transitionReason: "B.2 (MODE 4)",
+          },
+        ];
+      },
+      finalSegmentMaxHours: 48,
+    },
+
+    {
+      id: "case-3-mode",
+      label: "MODE at time — V1 restored before V2 inop (V2 fresh entry)",
+      layout: "mode_at_time",
+      stemDateFormat: "always",
+      params: {
+        t_V1_inop: { kind: "fixedHHMM", value: "0100" },
+        t_V1_restore: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 1,
+          maxHours: 2,
+        },
+        t_V2_inop: {
+          kind: "offsetHours",
+          from: "t_V1_restore",
+          minHours: 1,
+          maxHours: 1,
+        },
+      },
+      stemTemplate:
+        "At {t_V1_inop} Valve V1 is declared INOPERABLE.\n" +
+        "At {t_V1_restore} Valve V1 is restored to OPERABLE status.\n" +
+        "At {t_V2_inop} Valve V2 is declared INOPERABLE.\n" +
+        "All Required Actions are performed at the exact time required.\n\n" +
+        "At {t_queryTime}, the plant is required to be in MODE ___.",
+      modeTimeline: (p, ctx) => {
+        // V2 is a fresh Cond A entry; clock runs from V2 inop.
+        const condBEntry = addHours(p.t_V2_inop, ctx.CT_A);
+        return [
+          {
+            mode: 1,
+            fromTime: p.t_V1_inop,
+            transitionReason:
+              "Cond A entered (briefly for V1, then again for V2 as a fresh entry); no mode change required yet",
+          },
+          {
+            mode: 3,
+            fromTime: addHours(condBEntry, ctx.CT_B1),
+            transitionReason: "B.1 (MODE 3) — V2's Cond A clock expired",
+          },
+          {
+            mode: 4,
+            fromTime: addHours(condBEntry, ctx.CT_B2),
+            transitionReason: "B.2 (MODE 4)",
+          },
+        ];
+      },
+      finalSegmentMaxHours: 48,
+    },
+
+    {
+      id: "case-4-mode",
+      label: "MODE at time — 72-hr CT, V2 within 24 hr of V1",
+      layout: "mode_at_time",
+      stemDateFormat: "always",
+      ctx: { CT_A: 72, EXT_A: 24 },
+      reference: { lcoTableHtml: "assets/lco_1_3_4_72hr_table.html" },
+      params: {
+        t_V1_inop: { kind: "fixedHHMM", value: "0100" },
+        t_V2_inop: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 1,
+          maxHours: 22,
+        },
+        t_V1_restore: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 2,
+          maxHours: 23,
+        },
+      },
+      validate: (p) => p.t_V1_restore > p.t_V2_inop,
+      stemTemplate:
+        "On {t_V1_inop} Valve V1 is declared INOPERABLE.\n" +
+        "On {t_V2_inop} Valve V2 is declared INOPERABLE.\n" +
+        "On {t_V1_restore} Valve V1 is restored to OPERABLE status.\n" +
+        "All Required Actions are performed at the exact time required.\n\n" +
+        "At {t_queryTime}, the plant is required to be in MODE ___.",
+      modeTimeline: (p, ctx) => {
+        const condBEntry = Math.min(
+          addHours(p.t_V1_inop, ctx.CT_A + 24),
+          addHours(p.t_V2_inop, ctx.CT_A),
+        );
+        return [
+          {
+            mode: 1,
+            fromTime: p.t_V1_inop,
+            transitionReason:
+              "Cond A entered when V1 went inoperable — no mode change required",
+          },
+          {
+            mode: 3,
+            fromTime: addHours(condBEntry, ctx.CT_B1),
+            transitionReason: `B.1 (MODE 3 within ${ctx.CT_B1} hr of Cond B entry); Cond A expired via the more-restrictive of (a) V1+${ctx.CT_A}+24 or (b) V2+${ctx.CT_A}`,
+          },
+          {
+            mode: 4,
+            fromTime: addHours(condBEntry, ctx.CT_B2),
+            transitionReason: `B.2 (MODE 4 within ${ctx.CT_B2} hr of Cond B entry)`,
+          },
+        ];
+      },
+      finalSegmentMaxHours: 96,
+    },
+
+    {
+      id: "case-5-mode",
+      label: "MODE at time — 72-hr CT, V2 more than 24 hr after V1",
+      layout: "mode_at_time",
+      stemDateFormat: "always",
+      ctx: { CT_A: 72, EXT_A: 24 },
+      reference: { lcoTableHtml: "assets/lco_1_3_4_72hr_table.html" },
+      params: {
+        t_V1_inop: { kind: "fixedHHMM", value: "0100" },
+        t_V2_inop: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 25,
+          maxHours: 47,
+        },
+        t_V1_restore: {
+          kind: "offsetHours",
+          from: "t_V1_inop",
+          minHours: 26,
+          maxHours: 70,
+        },
+      },
+      validate: (p) => p.t_V1_restore > p.t_V2_inop,
+      stemTemplate:
+        "On {t_V1_inop} Valve V1 is declared INOPERABLE.\n" +
+        "On {t_V2_inop} Valve V2 is declared INOPERABLE.\n" +
+        "On {t_V1_restore} Valve V1 is restored to OPERABLE status.\n" +
+        "All Required Actions are performed at the exact time required.\n\n" +
+        "At {t_queryTime}, the plant is required to be in MODE ___.",
+      modeTimeline: (p, ctx) => {
+        const condBEntry = Math.min(
+          addHours(p.t_V1_inop, ctx.CT_A + 24),
+          addHours(p.t_V2_inop, ctx.CT_A),
+        );
+        return [
+          {
+            mode: 1,
+            fromTime: p.t_V1_inop,
+            transitionReason: "Cond A entered; no mode change required yet",
+          },
+          {
+            mode: 3,
+            fromTime: addHours(condBEntry, ctx.CT_B1),
+            transitionReason: `B.1 (MODE 3) — Cond A expired via the more-restrictive of (a) V1+${ctx.CT_A}+24 or (b) V2+${ctx.CT_A}; for V2 > V1+24 hr, (a) is more restrictive`,
+          },
+          {
+            mode: 4,
+            fromTime: addHours(condBEntry, ctx.CT_B2),
+            transitionReason: "B.2 (MODE 4)",
+          },
+        ];
+      },
+      finalSegmentMaxHours: 96,
     },
   ],
 };
