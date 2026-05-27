@@ -18,7 +18,7 @@
 // so reaching MODE 4 is "Condition B entry + 12 hours", NOT "B.1 + B.2"
 // sequential.
 
-import { addHours, formatTime } from "./time.js?v=9";
+import { addHours, formatTime } from "./time.js?v=10";
 
 // --- helpers ---------------------------------------------------------------
 
@@ -890,4 +890,225 @@ register(
     `Doubles Cond A's 7-day clock by adding a 7-day "extension". TS 1.3 ` +
     `extensions are capped at 24 hours and apply only within a single ` +
     `"or more" Condition. Cond A in 1.3-3 has no such allowance.`,
+);
+
+// ---------------- EXAMPLE 1.3-5 RULES ----------
+// LCO ACTIONS table identical to 1.3-4 BUT with NOTE:
+//   "Separate Condition entry is allowed for each inoperable valve."
+//
+// Pedagogy:
+// - Each inoperable valve has its OWN Condition A clock with the stated
+//   Completion Time, tracked independently from when that valve was
+//   declared inoperable.
+// - When a valve is restored to OPERABLE, only THAT valve's clock exits.
+// - The TS 1.3 +24-hour extension provision does NOT apply: per TS 1.3,
+//   "Completion Time extensions do not apply to those Specifications that
+//   have exceptions that allow completely separate re-entry into the
+//   Condition... These exceptions are stated in individual Specifications."
+//   The NOTE in 1.3-5 is exactly such an exception.
+// - For our cases V1 is always restored before V1's own Cond A clock
+//   expires, so V1's clock exits cleanly. V2 carries the controlling
+//   deadline (Cases 1, 3, 4, 5) — or V1 does, when V2 is the restored
+//   valve (Case 2).
+//
+// Cases 1-3 use ctx { CT_A: 4, CT_B1: 6, CT_B2: 12, EXT_A: 4 }.
+// Cases 4-5 use ctx { CT_A: 72, CT_B1: 6, CT_B2: 12, EXT_A: 24 }.
+// CT_A and EXT_A come from ctx so the same rules cover both ctx variants.
+
+// ---- correct rules ----
+
+register(
+  "V1_plus_CT_A_plus_B2_135",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Each valve has its own Condition A clock (per the NOTE allowing ` +
+    `separate Condition entry per inoperable valve). V1's clock runs ` +
+    `${ctx.CT_A} hr from V1 inop at ${formatTime(p.t_V1_inop)}; if V1 is ` +
+    `not restored by then, V1's Cond B is entered and V1's B.2 (MODE 4 ` +
+    `in ${ctx.CT_B2} hr) must be met. With V2 restored before its own ` +
+    `Cond A expires, V2's clock exits cleanly; V1's deadline of ` +
+    `${formatTime(addHours(p.t_V1_inop, ctx.CT_A + ctx.CT_B2))} controls.`,
+);
+
+register(
+  "V2_plus_CT_A_plus_B2_135",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Each valve has its own Condition A clock (per the NOTE allowing ` +
+    `separate Condition entry per inoperable valve). V2's clock runs ` +
+    `${ctx.CT_A} hr from V2 inop at ${formatTime(p.t_V2_inop)}; if V2 is ` +
+    `not restored by then, V2's Cond B is entered and V2's B.2 (MODE 4 ` +
+    `in ${ctx.CT_B2} hr) must be met. With V1 restored before its own ` +
+    `Cond A expires, V1's clock exits cleanly; V2's deadline of ` +
+    `${formatTime(addHours(p.t_V2_inop, ctx.CT_A + ctx.CT_B2))} controls. ` +
+    `No +24-hour extension applies — the NOTE allowing separate re-entry ` +
+    `means the TS 1.3 extension provision is excluded.`,
+);
+
+// ---- distractor rules ----
+
+register(
+  "V1_plus_B1_135",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_B1),
+  (p, ctx) =>
+    `Adds B.1's ${ctx.CT_B1}-hour Completion Time to V1's inop time. ` +
+    `Two issues: B.1 is the MODE 3 deadline (the question asks for MODE 4), ` +
+    `and B.1 begins at Cond B entry — not at V1's inop.`,
+);
+
+register(
+  "V2_plus_B1_135",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_B1),
+  (p, ctx) =>
+    `Adds B.1's ${ctx.CT_B1}-hour clock to V2's inop. B.1 is the MODE 3 ` +
+    `deadline (not MODE 4) and starts at Cond B entry (after V2's own ` +
+    `Condition A clock expires), not at V2's inop.`,
+);
+
+register(
+  "V1_plus_CT_A_plus_ext_135",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A + ctx.EXT_A),
+  (p, ctx) =>
+    `Adds a ${ctx.EXT_A}-hour "extension" to V1's Condition A clock, ` +
+    `stopping there. Two issues: per the NOTE allowing separate Condition ` +
+    `entry per valve, the TS 1.3 extension provision does NOT apply to ` +
+    `1.3-5; and even if it did, this stops at Cond A expiry instead of ` +
+    `adding B.2's ${ctx.CT_B2} hours for MODE 4.`,
+);
+
+register(
+  "V1_plus_CT_A_plus_B1_135",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A + ctx.CT_B1),
+  (p, ctx) =>
+    `V1's Condition A expiry plus B.1's ${ctx.CT_B1}-hour clock. B.1 is ` +
+    `the MODE 3 deadline; the question asks for MODE 4 (B.2, ${ctx.CT_B2} hr).`,
+);
+
+register(
+  "V2_plus_CT_A_plus_B1_135",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A + ctx.CT_B1),
+  (p, ctx) =>
+    `V2's Condition A expiry plus B.1's ${ctx.CT_B1}-hour clock. B.1 ` +
+    `gives the MODE 3 deadline (not MODE 4).`,
+);
+
+register(
+  "V1_plus_B2_135",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_B2),
+  (p, ctx) =>
+    `Adds B.2's ${ctx.CT_B2}-hour clock to V1's inop. B.2 begins at ` +
+    `entry to Cond B (after V1's own Cond A clock expires) — not at V1's ` +
+    `inop. With separate entries per valve, V1's Cond A still has to ` +
+    `expire (or V1 must be left unrestored long enough) before V1's B.2 ` +
+    `clock starts.`,
+);
+
+register(
+  "V2_plus_B2_135",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_B2),
+  (p, ctx) =>
+    `Adds B.2's ${ctx.CT_B2}-hour clock to V2's inop. B.2 begins at entry ` +
+    `to V2's Cond B (after V2's own Cond A clock of ${ctx.CT_A} hr expires) ` +
+    `— not at V2's inop.`,
+);
+
+register(
+  "V1_plus_CT_A_plus_ext_plus_B2_135",
+  (p, ctx) =>
+    addHours(p.t_V1_inop, ctx.CT_A + ctx.EXT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Applies a ${ctx.EXT_A}-hour extension to V1's Cond A clock, then ` +
+    `adds B.2. Per TS 1.3, the extension provision does NOT apply to ` +
+    `1.3-5 because the NOTE allows separate re-entry into the Condition ` +
+    `for each valve — exactly the kind of exception that excludes the ` +
+    `extension. Each valve runs its stated CT, period.`,
+);
+
+register(
+  "V2_plus_CT_A_plus_ext_plus_B2_135",
+  (p, ctx) =>
+    addHours(p.t_V2_inop, ctx.CT_A + ctx.EXT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Applies a ${ctx.EXT_A}-hour extension to V2's Cond A clock, then ` +
+    `adds B.2. The +${ctx.EXT_A}-hour extension does NOT apply in 1.3-5 ` +
+    `because the NOTE allows separate Condition entry per valve, which ` +
+    `excludes the TS 1.3 extension provision.`,
+);
+
+register(
+  "V1_plus_CT_A_plus_seq_B1_B2_135",
+  (p, ctx) =>
+    addHours(p.t_V1_inop, ctx.CT_A + ctx.CT_B1 + ctx.CT_B2),
+  (p, ctx) =>
+    `Treats B.1 (${ctx.CT_B1} hr) and B.2 (${ctx.CT_B2} hr) as sequential ` +
+    `after V1's Cond A expires. Per TS 1.3-1, B.1 and B.2 each run from ` +
+    `entry to Cond B — they run concurrently, not in sequence — so they ` +
+    `are NOT additive.`,
+);
+
+register(
+  "V1_restore_plus_CT_A_plus_ext_plus_B2_135",
+  (p, ctx) =>
+    addHours(p.t_V1_restore, ctx.CT_A + ctx.EXT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Anchors at V1's restoration time (${formatTime(p.t_V1_restore)}), ` +
+    `then applies V1's Cond A clock + a ${ctx.EXT_A}-hour extension + ` +
+    `B.2. V1's restoration EXITS V1's Cond A clock; it does NOT start a ` +
+    `new one. The controlling clock is V2's, running from V2's inop.`,
+);
+
+register(
+  "V1_plus_seq_B1_B2_135",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_B1 + ctx.CT_B2),
+  (p, ctx) =>
+    `B.1 + B.2 sequentially from V1's inop, skipping Condition A ` +
+    `entirely. V1's Cond A clock (${ctx.CT_A} hr) must elapse before ` +
+    `Cond B is entered. B.1 and B.2 also run concurrently from Cond B ` +
+    `entry, not additively.`,
+);
+
+register(
+  "V2_plus_seq_B1_B2_135",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_B1 + ctx.CT_B2),
+  (p, ctx) =>
+    `B.1 + B.2 sequentially from V2's inop, skipping Condition A. V2's ` +
+    `Cond A clock (${ctx.CT_A} hr) must elapse first, and B.1/B.2 run ` +
+    `concurrently from Cond B entry.`,
+);
+
+register(
+  "V1_plus_CT_A_only_135",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A),
+  (p, ctx) =>
+    `Reports V1's Cond A expiry (${ctx.CT_A} hr from V1 inop) and stops ` +
+    `there. This is when Cond B would be entered — the question asks for ` +
+    `MODE 4 (B.2), which adds another ${ctx.CT_B2} hours.`,
+);
+
+register(
+  "V2_plus_CT_A_only_135",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A),
+  (p, ctx) =>
+    `Reports V2's Cond A expiry (${ctx.CT_A} hr from V2 inop) and stops ` +
+    `there. The question asks for MODE 4 (B.2), which adds ${ctx.CT_B2} ` +
+    `more hours after V2's Cond B is entered.`,
+);
+
+register(
+  "V1_plus_CT_A_doubled_plus_B2_135",
+  (p, ctx) => addHours(p.t_V1_inop, ctx.CT_A + ctx.CT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Adds the full Cond A Completion Time (${ctx.CT_A} hr) as if it were ` +
+    `an "extension" to itself, then B.2. Misinterprets the TS 1.3 ` +
+    `extension cap (24 hr) as the stated CT (${ctx.CT_A} hr) — and ` +
+    `regardless, no extension applies to 1.3-5 because of the NOTE.`,
+);
+
+register(
+  "V2_plus_CT_A_doubled_plus_B2_135",
+  (p, ctx) => addHours(p.t_V2_inop, ctx.CT_A + ctx.CT_A + ctx.CT_B2),
+  (p, ctx) =>
+    `Adds the full Cond A Completion Time as if it were an extension to ` +
+    `V2's Cond A, then B.2. The TS 1.3 extension cap is 24 hours, not ` +
+    `${ctx.CT_A} — and the extension doesn't apply to 1.3-5 anyway.`,
 );

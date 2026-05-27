@@ -26,9 +26,9 @@
 //     minInstant,         // for date-rollover formatting
 //   }
 
-import { RULES } from "./rules.js?v=9";
-import { sample } from "./sampler.js?v=9";
-import { formatTime } from "./time.js?v=9";
+import { RULES } from "./rules.js?v=10";
+import { sample } from "./sampler.js?v=10";
+import { formatTime } from "./time.js?v=10";
 
 function shuffleInPlace(arr) {
   for (let i = arr.length - 1; i > 0; i--) {

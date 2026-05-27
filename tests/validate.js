@@ -14,6 +14,7 @@ import { example_1_3_1 } from "../data/example_1_3_1.js";
 import { example_1_3_2 } from "../data/example_1_3_2.js";
 import { example_1_3_3 } from "../data/example_1_3_3.js";
 import { example_1_3_4 } from "../data/example_1_3_4.js";
+import { example_1_3_5 } from "../data/example_1_3_5.js";
 import { generateQuestion } from "../js/generator.js";
 import { addHours, formatTime } from "../js/time.js";
 import { RULES } from "../js/rules.js";
@@ -253,6 +254,19 @@ totalFailures += runCase(example_1_3_4, example_1_3_4.cases[1], case2Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[2], case3Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[3], case4Closed);
 totalFailures += runCase(example_1_3_4, example_1_3_4.cases[4], case5Closed);
+
+// 1.3-5 closed-form
+//   Cases 1, 3, 4, 5: V2 + CT_A + CT_B2 (V2 carries deadline)
+//   Case 2: V1 + CT_A + CT_B2 (V1 carries deadline; V2 was restored)
+const ex_1_3_5_V2_closed = (params, ctx) =>
+  addHours(params.t_V2_inop, ctx.CT_A + ctx.CT_B2);
+const ex_1_3_5_V1_closed = (params, ctx) =>
+  addHours(params.t_V1_inop, ctx.CT_A + ctx.CT_B2);
+totalFailures += runCase(example_1_3_5, example_1_3_5.cases[0], ex_1_3_5_V2_closed);
+totalFailures += runCase(example_1_3_5, example_1_3_5.cases[1], ex_1_3_5_V1_closed);
+totalFailures += runCase(example_1_3_5, example_1_3_5.cases[2], ex_1_3_5_V2_closed);
+totalFailures += runCase(example_1_3_5, example_1_3_5.cases[3], ex_1_3_5_V2_closed);
+totalFailures += runCase(example_1_3_5, example_1_3_5.cases[4], ex_1_3_5_V2_closed);
 
 // ---- Canonical spot checks -----------------------------------------------
 console.log("\n=== Canonical spot checks ===");
